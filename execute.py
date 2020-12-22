@@ -20,7 +20,7 @@ sparse = True
 nonlinearity = 'prelu' # special name to separate parameters
 
 # ajd - ma tran lien ke. 0 vs 1
-adj, features, labels, idx_train, idx_val, idx_test = process.load_data(dataset)
+adj, features, labels, idx_train, idx_val, idx_test = process.load_data_pm(dataset)
 features, _ = process.preprocess_features(features)
 
 # so tram PM2.5
@@ -153,4 +153,3 @@ print('Average accuracy:', tot / 50)
 accs = torch.stack(accs)
 print(accs.mean())
 print(accs.std())
-

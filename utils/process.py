@@ -105,7 +105,7 @@ sk(idx, l):
     return np.array(mask, dtype=np.bool)
 
 
-def load_data_pm(dataset_str): # {'pubmed', 'citeseer', 'cora'}
+def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 'cora'}
     pm_dataset = pd.read_csv('./data/pm.csv')
     pm_dataset = pm_dataset.replace("**", 0)
     pm_dataset = pm_dataset.to_numpy()
@@ -118,6 +118,7 @@ def load_data_pm(dataset_str): # {'pubmed', 'citeseer', 'cora'}
         features[i, 0] = pm_data[-1, i]
 
     features = sparse.csr_matrix(features)
+    
 
     for i in range(gauges):
         source = []
@@ -128,14 +129,14 @@ def load_data_pm(dataset_str): # {'pubmed', 'citeseer', 'cora'}
         graph[i] = source
     
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
-    idx_test = test_idx_range.tolist()
-    idx_train = range(len(y))
-    idx_val = range(len(y), len(y)+500)
+    idx_train = range(features.shape[0]*train_size)
+    idx_val = range(features.shape[0]*train_size, features.shape[0]*(train_size+valid_size))
+    idx_test = range(features.shape[0]*(train_size+valid_size), features.shape[0])
 
     return adj, features, labels, idx_train, idx_val, idx_test
 
 
-def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
+def load_data(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 'cora'}
     
     """Load data.
     
