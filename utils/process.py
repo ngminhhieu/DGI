@@ -96,11 +96,44 @@ def parse_index_file(filename):
         index.append(int(line.strip()))
     return index
 
-def sample_mask(idx, l):
+
+def sample_ma
+sk(idx, l):
     """Create mask."""
     mask = np.zeros(l)
     mask[idx] = 1
     return np.array(mask, dtype=np.bool)
+
+
+def load_data_pm(dataset_str): # {'pubmed', 'citeseer', 'cora'}
+    pm_dataset = pd.read_csv('./data/pm.csv')
+    pm_dataset = pm_dataset.replace("**", 0)
+    pm_dataset = pm_dataset.to_numpy()
+    pm_data = pm_dataset[:, 4:]
+    pm_data = pm_data.astype(np.float)
+    gauges = pm_data.shape[1]
+    graph = defaultdict(list)
+    features = np.empty(shape=(gauges, 1))
+    for i in range(gauges):
+        features[i, 0] = pm_data[-1, i]
+
+    features = sparse.csr_matrix(features)
+
+    for i in range(gauges):
+        source = []
+        for j in range(gauges):
+            ran = random.random()
+            if ran < 0.1:
+                source.append(j)
+        graph[i] = source
+    
+    adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
+    idx_test = test_idx_range.tolist()
+    idx_train = range(len(y))
+    idx_val = range(len(y), len(y)+500)
+
+    return adj, features, labels, idx_train, idx_val, idx_test
+
 
 def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
     
