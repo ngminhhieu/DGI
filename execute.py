@@ -19,10 +19,13 @@ hid_units = 512
 sparse = True
 nonlinearity = 'prelu' # special name to separate parameters
 
+# ajd - ma tran lien ke. 0 vs 1
 adj, features, labels, idx_train, idx_val, idx_test = process.load_data(dataset)
 features, _ = process.preprocess_features(features)
 
+# so tram PM2.5
 nb_nodes = features.shape[0]
+# so features tuong ung voi moi tram
 ft_size = features.shape[1]
 nb_classes = labels.shape[1]
 
@@ -78,8 +81,10 @@ for epoch in range(nb_epochs):
         shuf_fts = shuf_fts.cuda()
         lbl = lbl.cuda()
     
+    # forward
     logits = model(features, shuf_fts, sp_adj if sparse else adj, sparse, None, None, None) 
 
+    # hàm loss phải đạo hàm được nếu muốn tự config
     loss = b_xent(logits, lbl)
 
     print('Loss:', loss)
@@ -96,7 +101,9 @@ for epoch in range(nb_epochs):
         print('Early stopping!')
         break
 
+    # calculate gradient
     loss.backward()
+    # update weight
     optimiser.step()
 
 print('Loading {}th epoch'.format(best_t))

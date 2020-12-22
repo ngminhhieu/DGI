@@ -103,7 +103,21 @@ def sample_mask(idx, l):
     return np.array(mask, dtype=np.bool)
 
 def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
-    """Load data."""
+    
+    """Load data.
+    
+    ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
+    ind.name.tx => the feature vectors of the test instances as scipy.sparse.csr.csr_matrix object;
+    ind.name.allx => the feature vectors of both labeled and unlabeled training instances
+        (a superset of ind.name.x) as scipy.sparse.csr.csr_matrix object;
+    ind.name.y => the one-hot labels of the labeled training instances as numpy.ndarray object;
+    ind.name.ty => the one-hot labels of the test instances as numpy.ndarray object;
+    ind.name.ally => the labels for instances in ind.name.allx as numpy.ndarray object;
+    ind.name.graph => a dict in the format {index: [index_of_neighbor_nodes]} as collections.defaultdict
+        object;
+    ind.name.test.index => the indices of test instances in graph, for the inductive setting as list object
+    
+    """
     names = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
     objects = []
     for i in range(len(names)):
