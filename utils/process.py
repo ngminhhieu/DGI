@@ -97,8 +97,7 @@ def parse_index_file(filename):
     return index
 
 
-def sample_ma
-sk(idx, l):
+def sample_mask(idx, l):
     """Create mask."""
     mask = np.zeros(l)
     mask[idx] = 1
