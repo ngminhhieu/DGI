@@ -115,13 +115,15 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
     pm_data = pm_data.astype(np.float)
     gauges = pm_data.shape[1]
     graph = defaultdict(list)
-    features = np.empty(shape=(gauges, 1))
+    features = np.empty(shape=(gauges, gauges-1))
+    labels = np.empty(shape=(gauges, 1))
+
     for i in range(gauges):
-        features[i, 0] = pm_data[-1, i]
+        features[i, 0:i] = pm_data[-1, 0:i]
+        features[i, i:] = pm_data[-1, i+1:]
+        labels[i, 0] = pm_data[-1, i]
 
     features = sp.csr_matrix(features)
-    
-
     for i in range(gauges):
         source = []
         for j in range(gauges):
@@ -137,10 +139,7 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
     idx_train = range(train_pivot)
     idx_val = range(train_pivot, valid_pivot)
     idx_test = range(valid_pivot, test_pivot)
-    labels = features
-    labels = labels.toarray()
     return adj, features, labels, idx_train, idx_val, idx_test
-
 
 def load_data(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 'cora'}
     
