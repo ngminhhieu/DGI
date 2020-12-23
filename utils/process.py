@@ -6,6 +6,9 @@ from scipy.sparse.linalg.eigen.arpack import eigsh
 import sys
 import torch
 import torch.nn as nn
+import pandas as pd
+from collections import defaultdict
+import random
 
 def parse_skipgram(fname):
     with open(fname) as f:
@@ -116,7 +119,7 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
     for i in range(gauges):
         features[i, 0] = pm_data[-1, i]
 
-    features = sparse.csr_matrix(features)
+    features = sp.csr_matrix(features)
     
 
     for i in range(gauges):
@@ -128,10 +131,14 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
         graph[i] = source
     
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
-    idx_train = range(features.shape[0]*train_size)
-    idx_val = range(features.shape[0]*train_size, features.shape[0]*(train_size+valid_size))
-    idx_test = range(features.shape[0]*(train_size+valid_size), features.shape[0])
-
+    train_pivot = int(features.shape[0]*train_size)
+    valid_pivot = int(features.shape[0]*(train_size+valid_size))
+    test_pivot = int(features.shape[0])
+    idx_train = range(train_pivot)
+    idx_val = range(train_pivot, valid_pivot)
+    idx_test = range(valid_pivot, test_pivot)
+    labels = features
+    labels = labels.toarray()
     return adj, features, labels, idx_train, idx_val, idx_test
 
 
@@ -181,7 +188,6 @@ def load_data(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 'co
 
     labels = np.vstack((ally, ty))
     labels[test_idx_reorder, :] = labels[test_idx_range, :]
-
     idx_test = test_idx_range.tolist()
     idx_train = range(len(y))
     idx_val = range(len(y), len(y)+500)

@@ -20,7 +20,7 @@ sparse = True
 nonlinearity = 'prelu' # special name to separate parameters
 
 # ajd - ma tran lien ke. 0 vs 1
-adj, features, labels, idx_train, idx_val, idx_test = process.load_data_pm(dataset)
+adj, features, labels, idx_train, idx_val, idx_test = process.load_data_pm(dataset, 0.6, 0.2)
 features, _ = process.preprocess_features(features)
 
 # so tram PM2.5
@@ -40,6 +40,7 @@ features = torch.FloatTensor(features[np.newaxis])
 if not sparse:
     adj = torch.FloatTensor(adj[np.newaxis])
 labels = torch.FloatTensor(labels[np.newaxis])
+print(labels.shape)
 idx_train = torch.LongTensor(idx_train)
 idx_val = torch.LongTensor(idx_val)
 idx_test = torch.LongTensor(idx_test)
