@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import sys
-from utils.CVAE import process
+from utils.cvae import process
 
 
 class VAE(nn.Module):

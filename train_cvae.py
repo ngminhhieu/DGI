@@ -10,7 +10,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
 from collections import defaultdict
-from models.CVAE.cvae import VAE
+from models.cvae.cvae import VAE
 
 
 def main(args):

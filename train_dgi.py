@@ -3,9 +3,9 @@ import scipy.sparse as sp
 import torch
 import torch.nn as nn
 
-from models.DGI.dgi import DGI
-from models.DGI.logreg import LogReg
-from utils.DGI import process
+from models.dgi.dgi import DGI
+from models.dgi.logreg import LogReg
+from utils.dgi import process
 
 dataset = 'cora'
 

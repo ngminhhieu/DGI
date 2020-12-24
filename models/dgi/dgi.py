@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-from models.DGI.gcn import GCN
-from models.DGI.readout import AvgReadout
-from models.DGI.discriminator import Discriminator
+from models.dgi.gcn import GCN
+from models.dgi.readout import AvgReadout
+from models.dgi.discriminator import Discriminator
 
 class DGI(nn.Module):
     def __init__(self, n_in, n_h, activation):
