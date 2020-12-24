@@ -3,8 +3,9 @@ import scipy.sparse as sp
 import torch
 import torch.nn as nn
 
-from models import DGI, LogReg
-from utils import process
+from models.DGI.dgi import DGI
+from models.DGI.logreg import LogReg
+from utils.DGI import process
 
 dataset = 'cora'
 
@@ -40,7 +41,6 @@ features = torch.FloatTensor(features[np.newaxis])
 if not sparse:
     adj = torch.FloatTensor(adj[np.newaxis])
 labels = torch.FloatTensor(labels[np.newaxis])
-print(labels.shape)
 idx_train = torch.LongTensor(idx_train)
 idx_val = torch.LongTensor(idx_val)
 idx_test = torch.LongTensor(idx_test)
