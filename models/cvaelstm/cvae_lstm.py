@@ -1,197 +1,490 @@
+import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.utils.rnn as rnn_utils
-from utils.cvaelstm.process import to_var
+from torch import nn, optim
+from torch import distributions
+from torch.utils.data import DataLoader
+from torch.autograd import Variable
+import os
+from utils.cvaelstm.process import BaseEstimator
 
 
-class SentenceVAE(nn.Module):
-    def __init__(self, vocab_size, embedding_size, rnn_type, hidden_size, word_dropout, embedding_dropout, latent_size,
-                sos_idx, eos_idx, pad_idx, unk_idx, max_sequence_length, num_layers=1, bidirectional=False):
+class Encoder(nn.Module):
+    """
+    Encoder network containing enrolled LSTM/GRU
 
-        super().__init__()
-        self.tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
+    :param number_of_features: number of input features
+    :param hidden_size: hidden size of the RNN
+    :param hidden_layer_depth: number of layers in RNN
+    :param latent_length: latent vector length
+    :param dropout: percentage of nodes to dropout
+    :param block: LSTM/GRU block
+    """
+    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, block = 'LSTM'):
 
-        self.max_sequence_length = max_sequence_length
-        self.sos_idx = sos_idx
-        self.eos_idx = eos_idx
-        self.pad_idx = pad_idx
-        self.unk_idx = unk_idx
+        super(Encoder, self).__init__()
 
-        self.latent_size = latent_size
-
-        self.rnn_type = rnn_type
-        self.bidirectional = bidirectional
-        self.num_layers = num_layers
+        self.number_of_features = number_of_features
         self.hidden_size = hidden_size
+        self.hidden_layer_depth = hidden_layer_depth
+        self.latent_length = latent_length
 
-        self.embedding = nn.Embedding(vocab_size, embedding_size)
-        self.word_dropout_rate = word_dropout
-        self.embedding_dropout = nn.Dropout(p=embedding_dropout)
-
-        if rnn_type == 'rnn':
-            rnn = nn.RNN
-        elif rnn_type == 'gru':
-            rnn = nn.GRU
-        # elif rnn_type == 'lstm':
-        #     rnn = nn.LSTM
+        if block == 'LSTM':
+            self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
+        elif block == 'GRU':
+            self.model = nn.GRU(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
         else:
-            raise ValueError()
+            raise NotImplementedError
 
-        self.encoder_rnn = rnn(embedding_size, hidden_size, num_layers=num_layers, bidirectional=self.bidirectional,
-                               batch_first=True)
-        self.decoder_rnn = rnn(embedding_size, hidden_size, num_layers=num_layers, bidirectional=self.bidirectional,
-                               batch_first=True)
+    def forward(self, x):
+        """Forward propagation of encoder. Given input, outputs the last hidden state of encoder
 
-        self.hidden_factor = (2 if bidirectional else 1) * num_layers
+        :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
+        :return: last hidden state of encoder, of shape (batch_size, hidden_size)
+        """
 
-        self.hidden2mean = nn.Linear(hidden_size * self.hidden_factor, latent_size)
-        self.hidden2logv = nn.Linear(hidden_size * self.hidden_factor, latent_size)
-        self.latent2hidden = nn.Linear(latent_size, hidden_size * self.hidden_factor)
-        self.outputs2vocab = nn.Linear(hidden_size * (2 if bidirectional else 1), vocab_size)
+        _, (h_end, c_end) = self.model(x)
 
-    def forward(self, input_sequence, length):
+        h_end = h_end[-1, :, :]
+        return h_end
 
-        batch_size = input_sequence.size(0)
-        sorted_lengths, sorted_idx = torch.sort(length, descending=True)
-        input_sequence = input_sequence[sorted_idx]
 
-        # ENCODER
-        input_embedding = self.embedding(input_sequence)
+class Lambda(nn.Module):
+    """Lambda module converts output of encoder to latent vector
 
-        packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True)
+    :param hidden_size: hidden size of the encoder
+    :param latent_length: latent vector length
+    """
+    def __init__(self, hidden_size, latent_length):
+        super(Lambda, self).__init__()
 
-        _, hidden = self.encoder_rnn(packed_input)
+        self.hidden_size = hidden_size
+        self.latent_length = latent_length
 
-        if self.bidirectional or self.num_layers > 1:
-            # flatten hidden state
-            hidden = hidden.view(batch_size, self.hidden_size*self.hidden_factor)
+        self.hidden_to_mean = nn.Linear(self.hidden_size, self.latent_length)
+        self.hidden_to_logvar = nn.Linear(self.hidden_size, self.latent_length)
+
+        nn.init.xavier_uniform_(self.hidden_to_mean.weight)
+        nn.init.xavier_uniform_(self.hidden_to_logvar.weight)
+
+    def forward(self, cell_output):
+        """Given last hidden state of encoder, passes through a linear layer, and finds the mean and variance
+
+        :param cell_output: last hidden state of encoder
+        :return: latent vector
+        """
+
+        self.latent_mean = self.hidden_to_mean(cell_output)
+        self.latent_logvar = self.hidden_to_logvar(cell_output)
+
+        if self.training:
+            std = torch.exp(0.5 * self.latent_logvar)
+            eps = torch.randn_like(std)
+            return eps.mul(std).add_(self.latent_mean)
         else:
-            hidden = hidden.squeeze()
+            return self.latent_mean
 
-        # REPARAMETERIZATION
-        mean = self.hidden2mean(hidden)
-        logv = self.hidden2logv(hidden)
-        std = torch.exp(0.5 * logv)
+class Decoder(nn.Module):
+    """Converts latent vector into output
 
-        z = to_var(torch.randn([batch_size, self.latent_size]))
-        z = z * std + mean
+    :param sequence_length: length of the input sequence
+    :param batch_size: batch size of the input sequence
+    :param hidden_size: hidden size of the RNN
+    :param hidden_layer_depth: number of layers in RNN
+    :param latent_length: latent vector length
+    :param output_size: 2, one representing the mean, other log std dev of the output
+    :param block: GRU/LSTM - use the same which you've used in the encoder
+    :param dtype: Depending on cuda enabled/disabled, create the tensor
+    """
+    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, block='LSTM'):
 
-        # DECODER
-        hidden = self.latent2hidden(z)
+        super(Decoder, self).__init__()
 
-        if self.bidirectional or self.num_layers > 1:
-            # unflatten hidden state
-            hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
+        self.hidden_size = hidden_size
+        self.batch_size = batch_size
+        self.sequence_length = sequence_length
+        self.hidden_layer_depth = hidden_layer_depth
+        self.latent_length = latent_length
+        self.output_size = output_size
+        self.dtype = dtype
+
+        if block == 'LSTM':
+            self.model = nn.LSTM(1, self.hidden_size, self.hidden_layer_depth)
+        elif block == 'GRU':
+            self.model = nn.GRU(1, self.hidden_size, self.hidden_layer_depth)
         else:
-            hidden = hidden.unsqueeze(0)
+            raise NotImplementedError
 
-        # decoder input
-        if self.word_dropout_rate > 0:
-            # randomly replace decoder input with <unk>
-            prob = torch.rand(input_sequence.size())
-            if torch.cuda.is_available():
-                prob=prob.cuda()
-            prob[(input_sequence.data - self.sos_idx) * (input_sequence.data - self.pad_idx) == 0] = 1
-            decoder_input_sequence = input_sequence.clone()
-            decoder_input_sequence[prob < self.word_dropout_rate] = self.unk_idx
-            input_embedding = self.embedding(decoder_input_sequence)
-        input_embedding = self.embedding_dropout(input_embedding)
-        packed_input = rnn_utils.pack_padded_sequence(input_embedding, sorted_lengths.data.tolist(), batch_first=True)
+        self.latent_to_hidden = nn.Linear(self.latent_length, self.hidden_size)
+        self.hidden_to_output = nn.Linear(self.hidden_size, self.output_size)
 
-        # decoder forward pass
-        outputs, _ = self.decoder_rnn(packed_input, hidden)
+        self.decoder_inputs = torch.zeros(self.sequence_length, self.batch_size, 1, requires_grad=True).type(self.dtype)
+        self.c_0 = torch.zeros(self.hidden_layer_depth, self.batch_size, self.hidden_size, requires_grad=True).type(self.dtype)
 
-        # process outputs
-        padded_outputs = rnn_utils.pad_packed_sequence(outputs, batch_first=True)[0]
-        padded_outputs = padded_outputs.contiguous()
-        _,reversed_idx = torch.sort(sorted_idx)
-        padded_outputs = padded_outputs[reversed_idx]
-        b,s,_ = padded_outputs.size()
+        nn.init.xavier_uniform_(self.latent_to_hidden.weight)
+        nn.init.xavier_uniform_(self.hidden_to_output.weight)
 
-        # project outputs to vocab
-        logp = nn.functional.log_softmax(self.outputs2vocab(padded_outputs.view(-1, padded_outputs.size(2))), dim=-1)
-        logp = logp.view(b, s, self.embedding.num_embeddings)
+    def forward(self, latent):
+        """Converts latent to hidden to output
 
-        return logp, mean, logv, z
+        :param latent: latent vector
+        :return: outputs consisting of mean and std dev of vector
+        """
+        h_state = self.latent_to_hidden(latent)
 
-    def inference(self, n=4, z=None):
-
-        if z is None:
-            batch_size = n
-            z = to_var(torch.randn([batch_size, self.latent_size]))
+        if isinstance(self.model, nn.LSTM):
+            h_0 = torch.stack([h_state for _ in range(self.hidden_layer_depth)])
+            decoder_output, _ = self.model(self.decoder_inputs, (h_0, self.c_0))
+        elif isinstance(self.model, nn.GRU):
+            h_0 = torch.stack([h_state for _ in range(self.hidden_layer_depth)])
+            decoder_output, _ = self.model(self.decoder_inputs, h_0)
         else:
-            batch_size = z.size(0)
+            raise NotImplementedError
 
-        hidden = self.latent2hidden(z)
+        out = self.hidden_to_output(decoder_output)
+        return out
 
-        if self.bidirectional or self.num_layers > 1:
-            # unflatten hidden state
-            hidden = hidden.view(self.hidden_factor, batch_size, self.hidden_size)
+def _assert_no_grad(tensor):
+    assert not tensor.requires_grad, \
+        "nn criterions don't compute the gradient w.r.t. targets - please " \
+        "mark these tensors as not requiring gradients"
 
-        hidden = hidden.unsqueeze(0)
+class VRAE(BaseEstimator, nn.Module):
+    """Variational recurrent auto-encoder. This module is used for dimensionality reduction of timeseries
 
-        # required for dynamic stopping of sentence generation
-        sequence_idx = torch.arange(0, batch_size, out=self.tensor()).long()  # all idx of batch
-        # all idx of batch which are still generating
-        sequence_running = torch.arange(0, batch_size, out=self.tensor()).long()
-        sequence_mask = torch.ones(batch_size, out=self.tensor()).bool()
-        # idx of still generating sequences with respect to current loop
-        running_seqs = torch.arange(0, batch_size, out=self.tensor()).long()
+    :param sequence_length: length of the input sequence
+    :param number_of_features: number of input features
+    :param hidden_size:  hidden size of the RNN
+    :param hidden_layer_depth: number of layers in RNN
+    :param latent_length: latent vector length
+    :param batch_size: number of timeseries in a single batch
+    :param learning_rate: the learning rate of the module
+    :param block: GRU/LSTM to be used as a basic building block
+    :param n_epochs: Number of iterations/epochs
+    :param dropout_rate: The probability of a node being dropped-out
+    :param optimizer: ADAM/ SGD optimizer to reduce the loss function
+    :param loss: SmoothL1Loss / MSELoss / ReconLoss / any custom loss which inherits from `_Loss` class
+    :param boolean cuda: to be run on GPU or not
+    :param print_every: The number of iterations after which loss should be printed
+    :param boolean clip: Gradient clipping to overcome explosion
+    :param max_grad_norm: The grad-norm to be clipped
+    :param dload: Download directory where models are to be dumped
+    """
+    def __init__(self, sequence_length, number_of_features, hidden_size=90, hidden_layer_depth=2, latent_length=20,
+                 batch_size=32, learning_rate=0.005, block='LSTM',
+                 n_epochs=5, dropout_rate=0., optimizer='Adam', loss='MSELoss',
+                 cuda=False, print_every=100, clip=True, max_grad_norm=5, dload='.'):
 
-        generations = self.tensor(batch_size, self.max_sequence_length).fill_(self.pad_idx).long()
+        super(VRAE, self).__init__()
 
+
+        self.dtype = torch.FloatTensor
+        self.use_cuda = cuda
+
+        if not torch.cuda.is_available() and self.use_cuda:
+            self.use_cuda = False
+
+
+        if self.use_cuda:
+            self.dtype = torch.cuda.FloatTensor
+
+
+        self.encoder = Encoder(number_of_features = number_of_features,
+                               hidden_size=hidden_size,
+                               hidden_layer_depth=hidden_layer_depth,
+                               latent_length=latent_length,
+                               dropout=dropout_rate,
+                               block=block)
+
+        self.lmbd = Lambda(hidden_size=hidden_size,
+                           latent_length=latent_length)
+
+        self.decoder = Decoder(sequence_length=sequence_length,
+                               batch_size = batch_size,
+                               hidden_size=hidden_size,
+                               hidden_layer_depth=hidden_layer_depth,
+                               latent_length=latent_length,
+                               output_size=number_of_features,
+                               block=block,
+                               dtype=self.dtype)
+
+        self.sequence_length = sequence_length
+        self.hidden_size = hidden_size
+        self.hidden_layer_depth = hidden_layer_depth
+        self.latent_length = latent_length
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.n_epochs = n_epochs
+
+        self.print_every = print_every
+        self.clip = clip
+        self.max_grad_norm = max_grad_norm
+        self.is_fitted = False
+        self.dload = dload
+
+        if self.use_cuda:
+            self.cuda()
+
+        if optimizer == 'Adam':
+            self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
+        elif optimizer == 'SGD':
+            self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
+        else:
+            raise ValueError('Not a recognized optimizer')
+
+        if loss == 'SmoothL1Loss':
+            self.loss_fn = nn.SmoothL1Loss(size_average=False)
+        elif loss == 'MSELoss':
+            self.loss_fn = nn.MSELoss(size_average=False)
+
+    def __repr__(self):
+        return """VRAE(n_epochs={n_epochs},batch_size={batch_size},cuda={cuda})""".format(
+                n_epochs=self.n_epochs,
+                batch_size=self.batch_size,
+                cuda=self.use_cuda)
+
+    def forward(self, x):
+        """
+        Forward propagation which involves one pass from inputs to encoder to lambda to decoder
+
+        :param x:input tensor
+        :return: the decoded output, latent vector
+        """
+        cell_output = self.encoder(x)
+        latent = self.lmbd(cell_output)
+        x_decoded = self.decoder(latent)
+
+        return x_decoded, latent
+
+    def _rec(self, x_decoded, x, loss_fn):
+        """
+        Compute the loss given output x decoded, input x and the specified loss function
+
+        :param x_decoded: output of the decoder
+        :param x: input to the encoder
+        :param loss_fn: loss function specified
+        :return: joint loss, reconstruction loss and kl-divergence loss
+        """
+        latent_mean, latent_logvar = self.lmbd.latent_mean, self.lmbd.latent_logvar
+
+        kl_loss = -0.5 * torch.mean(1 + latent_logvar - latent_mean.pow(2) - latent_logvar.exp())
+        recon_loss = loss_fn(x_decoded, x)
+
+        return kl_loss + recon_loss, recon_loss, kl_loss
+
+    def compute_loss(self, X):
+        """
+        Given input tensor, forward propagate, compute the loss, and backward propagate.
+        Represents the lifecycle of a single iteration
+
+        :param X: Input tensor
+        :return: total loss, reconstruction loss, kl-divergence loss and original input
+        """
+        x = Variable(X[:,:,:].type(self.dtype), requires_grad = True)
+
+        x_decoded, _ = self(x)
+        loss, recon_loss, kl_loss = self._rec(x_decoded, x.detach(), self.loss_fn)
+
+        return loss, recon_loss, kl_loss, x
+
+
+    def _train(self, train_loader):
+        """
+        For each epoch, given the batch_size, run this function batch_size * num_of_batches number of times
+
+        :param train_loader:input train loader with shuffle
+        :return:
+        """
+        self.train()
+
+        epoch_loss = 0
         t = 0
-        while t < self.max_sequence_length and len(running_seqs) > 0:
 
-            if t == 0:
-                input_sequence = to_var(torch.Tensor(batch_size).fill_(self.sos_idx).long())
+        for t, X in enumerate(train_loader):
 
-            input_sequence = input_sequence.unsqueeze(1)
+            # Index first element of array to return tensor
+            X = X[0]
 
-            input_embedding = self.embedding(input_sequence)
+            # required to swap axes, since dataloader gives output in (batch_size x seq_len x num_of_features)
+            X = X.permute(1,0,2)
 
-            output, hidden = self.decoder_rnn(input_embedding, hidden)
+            self.optimizer.zero_grad()
+            loss, recon_loss, kl_loss, _ = self.compute_loss(X)
+            loss.backward()
 
-            logits = self.outputs2vocab(output)
+            if self.clip:
+                torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm = self.max_grad_norm)
 
-            input_sequence = self._sample(logits)
+            # accumulator
+            epoch_loss += loss.item()
 
-            # save next input
-            generations = self._save_sample(generations, input_sequence, sequence_running, t)
+            self.optimizer.step()
 
-            # update gloabl running sequence
-            sequence_mask[sequence_running] = (input_sequence != self.eos_idx)
-            sequence_running = sequence_idx.masked_select(sequence_mask)
+            if (t + 1) % self.print_every == 0:
+                print('Batch %d, loss = %.4f, recon_loss = %.4f, kl_loss = %.4f' % (t + 1, loss.item(),
+                                                                                    recon_loss.item(), kl_loss.item()))
 
-            # update local running sequences
-            running_mask = (input_sequence != self.eos_idx).data
-            running_seqs = running_seqs.masked_select(running_mask)
+        print('Average loss: {:.4f}'.format(epoch_loss / t))
 
-            # prune input and hidden state according to local update
-            if len(running_seqs) > 0:
-                input_sequence = input_sequence[running_seqs]
-                hidden = hidden[:, running_seqs]
 
-                running_seqs = torch.arange(0, len(running_seqs), out=self.tensor()).long()
+    def fit(self, dataset, save = False):
+        """
+        Calls `_train` function over a fixed number of epochs, specified by `n_epochs`
 
-            t += 1
+        :param dataset: `Dataset` object
+        :param bool save: If true, dumps the trained model parameters as pickle file at `dload` directory
+        :return:
+        """
 
-        return generations, z
+        train_loader = DataLoader(dataset = dataset,
+                                  batch_size = self.batch_size,
+                                  shuffle = True,
+                                  drop_last=True)
 
-    def _sample(self, dist, mode='greedy'):
+        for i in range(self.n_epochs):
+            print('Epoch: %s' % i)
 
-        if mode == 'greedy':
-            _, sample = torch.topk(dist, 1, dim=-1)
-        sample = sample.reshape(-1)
+            self._train(train_loader)
 
-        return sample
+        self.is_fitted = True
+        if save:
+            self.save('model.pth')
 
-    def _save_sample(self, save_to, sample, running_seqs, t):
-        # select only still running
-        running_latest = save_to[running_seqs]
-        # update token at position t
-        running_latest[:,t] = sample.data
-        # save back
-        save_to[running_seqs] = running_latest
 
-        return save_to
+    def _batch_transform(self, x):
+        """
+        Passes the given input tensor into encoder and lambda function
+
+        :param x: input batch tensor
+        :return: intermediate latent vector
+        """
+        return self.lmbd(
+                    self.encoder(
+                        Variable(x.type(self.dtype), requires_grad = False)
+                    )
+        ).cpu().data.numpy()
+
+    def _batch_reconstruct(self, x):
+        """
+        Passes the given input tensor into encoder, lambda and decoder function
+
+        :param x: input batch tensor
+        :return: reconstructed output tensor
+        """
+
+        x = Variable(x.type(self.dtype), requires_grad = False)
+        x_decoded, _ = self(x)
+
+        return x_decoded.cpu().data.numpy()
+
+    def reconstruct(self, dataset, save = False):
+        """
+        Given input dataset, creates dataloader, runs dataloader on `_batch_reconstruct`
+        Prerequisite is that model has to be fit
+
+        :param dataset: input dataset who's output vectors are to be obtained
+        :param bool save: If true, dumps the output vector dataframe as a pickle file
+        :return:
+        """
+
+        self.eval()
+
+        test_loader = DataLoader(dataset = dataset,
+                                 batch_size = self.batch_size,
+                                 shuffle = False,
+                                 drop_last=True) # Don't shuffle for test_loader
+
+        if self.is_fitted:
+            with torch.no_grad():
+                x_decoded = []
+
+                for t, x in enumerate(test_loader):
+                    x = x[0]
+                    x = x.permute(1, 0, 2)
+
+                    x_decoded_each = self._batch_reconstruct(x)
+                    x_decoded.append(x_decoded_each)
+
+                x_decoded = np.concatenate(x_decoded, axis=1)
+
+                if save:
+                    if os.path.exists(self.dload):
+                        pass
+                    else:
+                        os.mkdir(self.dload)
+                    x_decoded.dump(self.dload + '/z_run.pkl')
+                return x_decoded
+
+        raise RuntimeError('Model needs to be fit')
+
+
+    def transform(self, dataset, save = False):
+        """
+        Given input dataset, creates dataloader, runs dataloader on `_batch_transform`
+        Prerequisite is that model has to be fit
+
+        :param dataset: input dataset who's latent vectors are to be obtained
+        :param bool save: If true, dumps the latent vector dataframe as a pickle file
+        :return:
+        """
+        self.eval()
+
+        test_loader = DataLoader(dataset = dataset,
+                                 batch_size = self.batch_size,
+                                 shuffle = False,
+                                 drop_last=True) # Don't shuffle for test_loader
+        if self.is_fitted:
+            with torch.no_grad():
+                z_run = []
+
+                for t, x in enumerate(test_loader):
+                    x = x[0]
+                    x = x.permute(1, 0, 2)
+
+                    z_run_each = self._batch_transform(x)
+                    z_run.append(z_run_each)
+
+                z_run = np.concatenate(z_run, axis=0)
+                if save:
+                    if os.path.exists(self.dload):
+                        pass
+                    else:
+                        os.mkdir(self.dload)
+                    z_run.dump(self.dload + '/z_run.pkl')
+                return z_run
+
+        raise RuntimeError('Model needs to be fit')
+
+    def fit_transform(self, dataset, save = False):
+        """
+        Combines the `fit` and `transform` functions above
+
+        :param dataset: Dataset on which fit and transform have to be performed
+        :param bool save: If true, dumps the model and latent vectors as pickle file
+        :return: latent vectors for input dataset
+        """
+        self.fit(dataset, save = save)
+        return self.transform(dataset, save = save)
+
+    def save(self, file_name):
+        """
+        Pickles the model parameters to be retrieved later
+
+        :param file_name: the filename to be saved as,`dload` serves as the download directory
+        :return: None
+        """
+        PATH = self.dload + '/' + file_name
+        if os.path.exists(self.dload):
+            pass
+        else:
+            os.mkdir(self.dload)
+        torch.save(self.state_dict(), PATH)
+
+    def load(self, PATH):
+        """
+        Loads the model's parameters from the path mentioned
+
+        :param PATH: Should contain pickle file
+        :return: None
+        """
+        self.is_fitted = True
+        self.load_state_dict(torch.load(PATH))

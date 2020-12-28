@@ -1,59 +1,54 @@
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.base import BaseEstimator as SklearnBaseEstimator
 import torch
 import numpy as np
-from torch.autograd import Variable
-from collections import defaultdict, Counter, OrderedDict
+import pandas as pd
+import matplotlib.pyplot as plt
+import streamlit as st
+plt.style.use("fivethirtyeight")
+
+def getData(dataset, sequence_length, horizon, output_dim):
+    
+    T = dataset.shape[0]-sequence_length-horizon
+    ips = np.empty(shape=(T, sequence_length, dataset.shape[1]))
+    ops = np.empty(shape=(T, horizon, output_dim))
+    for i in range(T):
+        ips[i, :, :] = dataset[i:i+sequence_length]
+        ops[i, :, :] = dataset[i+sequence_length:i+sequence_length+horizon, -output_dim]
+
+    return ips, ops
 
 
-class OrderedCounter(Counter, OrderedDict):
-    """Counter that remembers the order elements are first encountered"""
-    def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, OrderedDict(self))
+def standardizeData(X, SS = None, train = False):
+    """Given a list of input features, standardizes them to bring them onto a homogenous scale
 
-    def __reduce__(self):
-        return self.__class__, (OrderedDict(self),)
+    Args:
+        X ([dataframe]): [A dataframe of all the input values]
+        SS ([object], optional): [A MinMaxScaler object that holds mean and std of a standardized dataset]. Defaults to None.
+        train (bool, optional): [If False, means validation set to be loaded and SS needs to be passed to scale it]. Defaults to False.
+    """
+    if train:
+        SS = MinMaxScaler()
+        new_X = SS.fit_transform(X)
+        return (new_X, SS)
+    else:
+        new_X = SS.transform(X)
+        return (new_X, None)
 
+def train_val_test_split(data, valid_size, test_size):
+    
+    train_len = int(data.shape[0] * (1 - test_size - valid_size))
+    valid_len = int(data.shape[0] * valid_size)
 
-def to_var(x):
-    if torch.cuda.is_available():
-        x = x.cuda()
-    return x
+    train_set = data[0:train_len]
+    valid_set = data[train_len: train_len + valid_len]
+    test_set = data[train_len + valid_len:]
 
-
-def idx2word(idx, i2w, pad_idx):
-    sent_str = [str()]*len(idx)
-    for i, sent in enumerate(idx):
-        for word_id in sent:
-            if word_id == pad_idx:
-                break
-            sent_str[i] += i2w[str(word_id.item())] + " "
-        sent_str[i] = sent_str[i].strip()
-    return sent_str
-
-
-def interpolate(start, end, steps):
-
-    interpolation = np.zeros((start.shape[0], steps + 2))
-
-    for dim, (s, e) in enumerate(zip(start, end)):
-        interpolation[dim] = np.linspace(s, e, steps+2)
-
-    return interpolation.T
+    return train_set, valid_set, test_set
 
 
-def expierment_name(args, ts):
-    exp_name = str()
-    exp_name += "BS=%i_" % args.batch_size
-    exp_name += "LR={}_".format(args.learning_rate)
-    exp_name += "EB=%i_" % args.embedding_size
-    exp_name += "%s_" % args.rnn_type.upper()
-    exp_name += "HS=%i_" % args.hidden_size
-    exp_name += "L=%i_" % args.num_layers
-    exp_name += "BI=%i_" % args.bidirectional
-    exp_name += "LS=%i_" % args.latent_size
-    exp_name += "WD={}_".format(args.word_dropout)
-    exp_name += "ANN=%s_" % args.anneal_function.upper()
-    exp_name += "K={}_".format(args.k)
-    exp_name += "X0=%i_" % args.x0
-    exp_name += "TS=%s" % ts
+class BaseEstimator(SklearnBaseEstimator):
+    # http://msmbuilder.org/development/apipatterns.html
 
-    return exp_name
+    def summarize(self):
+        return 'NotImplemented'
