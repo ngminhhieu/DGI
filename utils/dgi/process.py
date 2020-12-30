@@ -142,6 +142,14 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
             if ran < 0.1:
                 source.append(j)
         graph[i] = source
+
+    data_points = np.array([[-1, -1], [-2, -1], [-3, -2], [1, 1], [2, 1], [3, 2]])
+    kdt = KDTree(data_points, leaf_size=30, metric='euclidean')
+    # dist, ind = kdt.query(data_points, k=len(data_points), return_distance=True)
+    ind, dist = kdt.query_radius(data_points, r=1.5, return_distance=True)
+    for i in range(len(data_points)):
+        source = np.where(ind[i]!=i)
+        graph[i] = source
     
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
     train_pivot = int(features.shape[0]*train_size)

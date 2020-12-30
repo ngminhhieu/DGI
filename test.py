@@ -2,6 +2,7 @@ import os
 import networkx as nx
 import pandas as pd
 import random
+from sklearn.neighbors import KDTree
 import numpy as np
 from collections import defaultdict
 from scipy import sparse
@@ -31,4 +32,10 @@ for i in range(gauges):
             source.append(j)
     graph[i] = source
 
-
+X = np.array([[-1, -1], [-2, -1], [-3, -2], [1, 1], [2, 1], [3, 2]])
+kdt = KDTree(X, leaf_size=30, metric='euclidean')
+# dist, ind = kdt.query(X, k=len(X), return_distance=True)
+ind, dist = kdt.query_radius(X, r=1.5, return_distance=True)
+for i in range(len(ind)):
+    index = np.where(ind[i]!=i)
+    print(index)
