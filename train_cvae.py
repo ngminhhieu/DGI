@@ -53,6 +53,11 @@ def main(args):
 
         for iteration, (x, y) in enumerate(data_loader):
             x, y = x.to(device), y.to(device)
+            print(x.shape)
+            print(y.shape)
+            print(x)
+            print(y)
+            sys.exit()
             if args.conditional:
                 recon_x, mean, log_var, z = vae(x, y)
             else:

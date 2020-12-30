@@ -70,7 +70,8 @@ vrae = VRAE(sequence_length=sequence_length,
             max_grad_norm=max_grad_norm,
             loss = loss,
             block = block,
-            dload = dload)
+            dload = dload,
+            conditional = True)
 
 vrae.fit(trainX)
 z_run = vrae.transform(valX)

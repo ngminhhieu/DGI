@@ -35,13 +35,14 @@ class Encoder(nn.Module):
         else:
             raise NotImplementedError
 
-    def forward(self, x):
+    def forward(self, x, c=None):
         """Forward propagation of encoder. Given input, outputs the last hidden state of encoder
 
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
-
+        if self.conditional:
+            x = torch.cat((x, c), dim=-1)
         _, (h_end, c_end) = self.model(x)
 
         h_end = h_end[-1, :, :]
@@ -108,27 +109,29 @@ class Decoder(nn.Module):
         self.dtype = dtype
 
         if block == 'LSTM':
-            self.model = nn.LSTM(1, self.hidden_size, self.hidden_layer_depth)
+            self.model = nn.LSTM(output_dim, self.hidden_size, self.hidden_layer_depth)
         elif block == 'GRU':
-            self.model = nn.GRU(1, self.hidden_size, self.hidden_layer_depth)
+            self.model = nn.GRU(output_dim, self.hidden_size, self.hidden_layer_depth)
         else:
             raise NotImplementedError
 
         self.latent_to_hidden = nn.Linear(self.latent_length, self.hidden_size)
         self.hidden_to_output = nn.Linear(self.hidden_size, self.output_size)
 
-        self.decoder_inputs = torch.zeros(self.sequence_length, self.batch_size, 1, requires_grad=True).type(self.dtype)
+        self.decoder_inputs = torch.zeros(self.sequence_length, self.batch_size, output_dim, requires_grad=True).type(self.dtype)
         self.c_0 = torch.zeros(self.hidden_layer_depth, self.batch_size, self.hidden_size, requires_grad=True).type(self.dtype)
 
         nn.init.xavier_uniform_(self.latent_to_hidden.weight)
         nn.init.xavier_uniform_(self.hidden_to_output.weight)
 
-    def forward(self, latent):
+    def forward(self, latent, c=None):
         """Converts latent to hidden to output
 
         :param latent: latent vector
         :return: outputs consisting of mean and std dev of vector
         """
+        if self.conditional:
+            latent = torch.cat((latent, c), dim=-1)
         h_state = self.latent_to_hidden(latent)
 
         if isinstance(self.model, nn.LSTM):
@@ -169,10 +172,10 @@ class VRAE(BaseEstimator, nn.Module):
     :param max_grad_norm: The grad-norm to be clipped
     :param dload: Download directory where models are to be dumped
     """
-    def __init__(self, sequence_length, number_of_features, hidden_size=90, hidden_layer_depth=2, latent_length=20,
+    def __init__(self, sequence_length, number_of_features, output_dim=1, hidden_size=90, hidden_layer_depth=2, latent_length=20,
                  batch_size=32, learning_rate=0.005, block='LSTM',
                  n_epochs=5, dropout_rate=0., optimizer='Adam', loss='MSELoss',
-                 cuda=False, print_every=100, clip=True, max_grad_norm=5, dload='.'):
+                 cuda=False, print_every=100, clip=True, max_grad_norm=5, dload='.', conditional=False):
 
         super(VRAE, self).__init__()
 
@@ -220,6 +223,7 @@ class VRAE(BaseEstimator, nn.Module):
         self.max_grad_norm = max_grad_norm
         self.is_fitted = False
         self.dload = dload
+        self.conditional = conditional
 
         if self.use_cuda:
             self.cuda()
@@ -242,16 +246,16 @@ class VRAE(BaseEstimator, nn.Module):
                 batch_size=self.batch_size,
                 cuda=self.use_cuda)
 
-    def forward(self, x):
+    def forward(self, x, c=None):
         """
         Forward propagation which involves one pass from inputs to encoder to lambda to decoder
 
         :param x:input tensor
         :return: the decoded output, latent vector
         """
-        cell_output = self.encoder(x)
+        cell_output = self.encoder(x, c)
         latent = self.lmbd(cell_output)
-        x_decoded = self.decoder(latent)
+        x_decoded = self.decoder(latent, c)
 
         return x_decoded, latent
 
