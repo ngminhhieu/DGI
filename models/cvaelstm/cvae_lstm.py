@@ -96,7 +96,7 @@ class Decoder(nn.Module):
     :param block: GRU/LSTM - use the same which you've used in the encoder
     :param dtype: Depending on cuda enabled/disabled, create the tensor
     """
-    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, block='LSTM'):
+    def __init__(self, sequence_length, output_dim, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, block='LSTM'):
 
         super(Decoder, self).__init__()
 
@@ -202,6 +202,7 @@ class VRAE(BaseEstimator, nn.Module):
                            latent_length=latent_length)
 
         self.decoder = Decoder(sequence_length=sequence_length,
+                               output_dim=output_dim,
                                batch_size = batch_size,
                                hidden_size=hidden_size,
                                hidden_layer_depth=hidden_layer_depth,
