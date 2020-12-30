@@ -40,6 +40,7 @@ testY = TensorDataset(torch.from_numpy(testY))
 
 dload = './model_dir'
 hidden_size = 90
+output_dim = 1
 hidden_layer_depth = 1
 latent_length = 20
 batch_size = 32
@@ -53,9 +54,11 @@ clip = True # options: True, False
 max_grad_norm=5
 loss = 'MSELoss' # options: SmoothL1Loss, MSELoss
 block = 'LSTM' # options: LSTM, GRU
+conditional = True
 
 vrae = VRAE(sequence_length=sequence_length,
             number_of_features = number_of_features,
+            output_dim = output_dim,
             hidden_size = hidden_size, 
             hidden_layer_depth = hidden_layer_depth,
             latent_length = latent_length,
@@ -71,7 +74,7 @@ vrae = VRAE(sequence_length=sequence_length,
             loss = loss,
             block = block,
             dload = dload,
-            conditional = True)
+            conditional = conditional)
 
 vrae.fit(trainX)
 z_run = vrae.transform(valX)

@@ -19,14 +19,14 @@ class Encoder(nn.Module):
     :param dropout: percentage of nodes to dropout
     :param block: LSTM/GRU block
     """
-    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, block = 'LSTM'):
+    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, conditional, block = 'LSTM'):
 
         super(Encoder, self).__init__()
-
         self.number_of_features = number_of_features
         self.hidden_size = hidden_size
         self.hidden_layer_depth = hidden_layer_depth
         self.latent_length = latent_length
+        self.conditional = conditional
 
         if block == 'LSTM':
             self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
@@ -42,7 +42,9 @@ class Encoder(nn.Module):
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
         if self.conditional:
+            print(x.shape)
             x = torch.cat((x, c), dim=-1)
+        
         _, (h_end, c_end) = self.model(x)
 
         h_end = h_end[-1, :, :]
@@ -96,7 +98,7 @@ class Decoder(nn.Module):
     :param block: GRU/LSTM - use the same which you've used in the encoder
     :param dtype: Depending on cuda enabled/disabled, create the tensor
     """
-    def __init__(self, sequence_length, output_dim, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, block='LSTM'):
+    def __init__(self, sequence_length, output_dim, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, conditional, block='LSTM'):
 
         super(Decoder, self).__init__()
 
@@ -107,6 +109,7 @@ class Decoder(nn.Module):
         self.latent_length = latent_length
         self.output_size = output_size
         self.dtype = dtype
+        self.conditional = conditional
 
         if block == 'LSTM':
             self.model = nn.LSTM(output_dim, self.hidden_size, self.hidden_layer_depth)
@@ -196,7 +199,8 @@ class VRAE(BaseEstimator, nn.Module):
                                hidden_layer_depth=hidden_layer_depth,
                                latent_length=latent_length,
                                dropout=dropout_rate,
-                               block=block)
+                               block=block,
+                               conditional=conditional)
 
         self.lmbd = Lambda(hidden_size=hidden_size,
                            latent_length=latent_length)
@@ -209,6 +213,7 @@ class VRAE(BaseEstimator, nn.Module):
                                latent_length=latent_length,
                                output_size=number_of_features,
                                block=block,
+                               conditional=conditional,
                                dtype=self.dtype)
 
         self.sequence_length = sequence_length
@@ -224,7 +229,6 @@ class VRAE(BaseEstimator, nn.Module):
         self.max_grad_norm = max_grad_norm
         self.is_fitted = False
         self.dload = dload
-        self.conditional = conditional
 
         if self.use_cuda:
             self.cuda()
@@ -308,9 +312,12 @@ class VRAE(BaseEstimator, nn.Module):
 
             # Index first element of array to return tensor
             X = X[0]
+            print('Hereeee')
+            print(X.shape)
 
             # required to swap axes, since dataloader gives output in (batch_size x seq_len x num_of_features)
             X = X.permute(1,0,2)
+            print(X.shape)
 
             self.optimizer.zero_grad()
             loss, recon_loss, kl_loss, _ = self.compute_loss(X)
