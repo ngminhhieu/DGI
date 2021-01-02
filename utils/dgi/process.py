@@ -9,6 +9,7 @@ import torch.nn as nn
 import pandas as pd
 from collections import defaultdict
 import random
+from sklearn.neighbors import KDTree
 
 
 def idx2onehot(idx, n):
@@ -143,13 +144,21 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
                 source.append(j)
         graph[i] = source
 
-    data_points = np.array([[-1, -1], [-2, -1], [-3, -2], [1, 1], [2, 1], [3, 2]])
+    ds_points = pd.read_csv('./data/locations.csv').to_numpy()
+    data_points = np.empty(shape=(len(ds_points), 2))
+    for i in range(len(ds_points)):
+        data_points[i, 0] = ds_points[i, 1]
+        data_points[i, 1] = ds_points[i, 2]
+
     kdt = KDTree(data_points, leaf_size=30, metric='euclidean')
-    # dist, ind = kdt.query(data_points, k=len(data_points), return_distance=True)
-    ind, dist = kdt.query_radius(data_points, r=1.5, return_distance=True)
+    dist, ind = kdt.query(data_points, k=len(data_points), return_distance=True)
+    # print(dist)
+    ind, dist = kdt.query_radius(data_points, r=0.3, return_distance=True)
     for i in range(len(data_points)):
         source = np.where(ind[i]!=i)
         graph[i] = source
+    print(graph)
+    sys.exit()
     
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
     train_pivot = int(features.shape[0]*train_size)
