@@ -119,33 +119,23 @@ def sample_mask(idx, l):
     return np.array(mask, dtype=np.bool)
 
 
-def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 'cora'}
-    pm_dataset = pd.read_csv('./data/pm.csv')
-    pm_dataset = pm_dataset.replace("**", 0)
-    pm_dataset = pm_dataset.to_numpy()
-    pm_data = pm_dataset[:, 4:]
-    pm_data = pm_data.astype(np.float)
-    gauges = pm_data.shape[1]
-    graph = defaultdict(list)
+def load_data_pm(dataset): # {'pubmed', 'citeseer', 'cora'}
+    gauges = dataset.shape[1]
     features = np.empty(shape=(gauges, gauges-1))
     labels = np.empty(shape=(gauges, 1))
 
     for i in range(gauges):
-        features[i, 0:i] = pm_data[-1, 0:i]
-        features[i, i:] = pm_data[-1, i+1:]
-        labels[i, 0] = pm_data[-1, i]
+        features[i, 0:i] = dataset[-1, 0:i]
+        features[i, i:] = dataset[-1, i+1:]
+        labels[i, 0] = dataset[-1, i]
 
     features = sp.csr_matrix(features)
-    # for i in range(gauges):
-    #     source = []
-    #     for j in range(gauges):
-    #         ran = random.random()
-    #         if ran < 0.1:
-    #             source.append(j)
-    #     graph[i] = source
+    return features, labels
 
-    ds_points = pd.read_csv('./data/locations.csv').to_numpy()
+def build_graph(location_path):
+    ds_points = pd.read_csv(location_path).to_numpy()
     data_points = np.empty(shape=(len(ds_points), 2))
+    graph = defaultdict(list)
     for i in range(len(ds_points)):
         data_points[i, 0] = ds_points[i, 1]
         data_points[i, 1] = ds_points[i, 2]
@@ -159,13 +149,16 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
         graph[i] = source
     
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
-    train_pivot = int(features.shape[0]*train_size)
-    valid_pivot = int(features.shape[0]*(train_size+valid_size))
-    test_pivot = int(features.shape[0])
+    return adj
+
+def train_valid_test(dataset, train_size, valid_size):
+    train_pivot = int(len(dataset)*train_size)
+    valid_pivot = int(len(dataset)*(train_size+valid_size))
+    test_pivot = int(len(dataset))
     idx_train = range(train_pivot)
     idx_val = range(train_pivot, valid_pivot)
     idx_test = range(valid_pivot, test_pivot)
-    return adj, features, labels, idx_train, idx_val, idx_test
+    return idx_train, idx_val, idx_test
 
 def load_data(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 'cora'}
     
