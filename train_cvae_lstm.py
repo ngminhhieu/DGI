@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import pandas as pd
 import plotly
+import sys
 from torch.utils.data import DataLoader, TensorDataset
 from utils.cvaelstm.process import train_val_test_split, getData, standardizeData
 # plotly.offline.init_notebook_mode()
@@ -28,6 +29,8 @@ trainX, trainY = getData(normalized_train, sequence_length, horizon, output_dim)
 valX, valY = getData(normalized_val, sequence_length, horizon, output_dim)
 testX, testY = getData(normalized_test, sequence_length, horizon, output_dim)
 trainY = trainY[:, 0, :]
+print(trainX.shape)
+sys.exit()
 valY = valY[:, 0, :]
 testY = testY[:, 0, :]
 trainX = TensorDataset(torch.from_numpy(trainX))
@@ -36,7 +39,6 @@ valX = TensorDataset(torch.from_numpy(valX))
 valY = TensorDataset(torch.from_numpy(valY))
 testX = TensorDataset(torch.from_numpy(testX))
 testY = TensorDataset(torch.from_numpy(testY))
-
 
 dload = './model_dir'
 hidden_size = 90
