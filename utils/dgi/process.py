@@ -136,13 +136,13 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
         labels[i, 0] = pm_data[-1, i]
 
     features = sp.csr_matrix(features)
-    for i in range(gauges):
-        source = []
-        for j in range(gauges):
-            ran = random.random()
-            if ran < 0.1:
-                source.append(j)
-        graph[i] = source
+    # for i in range(gauges):
+    #     source = []
+    #     for j in range(gauges):
+    #         ran = random.random()
+    #         if ran < 0.1:
+    #             source.append(j)
+    #     graph[i] = source
 
     ds_points = pd.read_csv('./data/locations.csv').to_numpy()
     data_points = np.empty(shape=(len(ds_points), 2))
@@ -155,7 +155,7 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
     # print(dist)
     ind, dist = kdt.query_radius(data_points, r=0.3, return_distance=True)
     for i in range(len(data_points)):
-        source = np.where(ind[i]!=i)
+        source = np.delete(ind[i], np.where(ind[i]==i))
         graph[i] = source
     
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))

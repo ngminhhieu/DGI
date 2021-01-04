@@ -32,19 +32,21 @@ data_dir = os.path.expanduser("./data/")
 #             source.append(j)
 #     graph[i] = source
 
-# X = np.array([[-1, -1], [-2, -1], [-3, -2], [1, 1], [2, 1], [3, 2]])
-# kdt = KDTree(X, leaf_size=30, metric='euclidean')
-# # dist, ind = kdt.query(X, k=len(X), return_distance=True)
-# ind, dist = kdt.query_radius(X, r=1.5, return_distance=True)
-# for i in range(len(ind)):
-#     index = np.where(ind[i]!=i)
-#     print(index)
+X = np.array([[-1, -1], [-2, -1], [-3, -2], [1, 1], [2, 1], [3, 2]])
+kdt = KDTree(X, leaf_size=30, metric='euclidean')
+# dist, ind = kdt.query(X, k=len(X), return_distance=True)
+ind, dist = kdt.query_radius(X, r=1.5, return_distance=True)
+print(ind)
+for i in range(len(ind)):
+    index = np.delete(ind[i], np.where(ind[i]==i))
+    # print(ind[i].shape)
+    print(index)
 
 
-ds_points = pd.read_csv('./data/locations.csv').to_numpy()
-# print(ds_points)
-data_points = np.empty(shape=(len(ds_points), 2))
-for i in range(len(ds_points)):
-    data_points[i, 0] = ds_points[i, 1]
-    data_points[i, 1] = ds_points[i, 2]
-print(data_points)
+# ds_points = pd.read_csv('./data/locations.csv').to_numpy()
+# # print(ds_points)
+# data_points = np.empty(shape=(len(ds_points), 2))
+# for i in range(len(ds_points)):
+#     data_points[i, 0] = ds_points[i, 1]
+#     data_points[i, 1] = ds_points[i, 2]
+# print(data_points)
