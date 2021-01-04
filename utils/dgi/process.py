@@ -157,8 +157,6 @@ def load_data_pm(dataset_str, train_size, valid_size): # {'pubmed', 'citeseer', 
     for i in range(len(data_points)):
         source = np.where(ind[i]!=i)
         graph[i] = source
-    print(graph)
-    sys.exit()
     
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
     train_pivot = int(features.shape[0]*train_size)
