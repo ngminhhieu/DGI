@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from models.dgi.dgi import DGI
-from models.dgi.reg import MultipleRegression
+from models.dgi.logreg import LogReg
 from utils.dgi import process
 import sys
 
@@ -27,7 +27,6 @@ pm_dataset = pm_dataset.replace("**", 0)
 pm_dataset = pm_dataset.to_numpy()
 pm_data = pm_dataset[:, 4:]
 pm_data = pm_data.astype(np.float)
-pm_data = pm_data[:10]
 
 adj = process.build_graph('./data/locations.csv')
 idx_train, idx_val, idx_test = process.train_valid_test(pm_data, 0.6, 0.2)
@@ -66,23 +65,21 @@ best = 1e9
 best_t = 0
 
 embeds = np.empty(shape=(len(pm_data), pm_data.shape[1], hid_units))
-labels = np.empty(shape=(len(pm_data), pm_data.shape[1], 1))
 for i in range(len(pm_data)):
-    features, label  = process.load_data_pm(pm_data)
+    features, labels  = process.load_data_pm(pm_data)
     features, _ = process.preprocess_features(features)
     # so tram PM2.5
     nb_nodes = features.shape[0]
     # so features tuong ung voi moi tram
     ft_size = features.shape[1]
     features = torch.FloatTensor(features[np.newaxis])
-    label = torch.FloatTensor(label[np.newaxis])
-    labels[i, :, :] = label
+    labels = torch.FloatTensor(labels[np.newaxis])
     model = DGI(ft_size, hid_units, nonlinearity)
     optimiser = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2_coef)
     if torch.cuda.is_available():
         features = features.cuda()
 
-    for epoch in range(1):
+    for epoch in range(nb_epochs):
         model.train()
         optimiser.zero_grad()
 
@@ -126,41 +123,51 @@ for i in range(len(pm_data)):
     model.load_state_dict(torch.load('./data/trained/best_dgi.pkl'))
     embeds[i, :, :], _ = model.embed(features, sp_adj if sparse else adj, sparse, None)
 
-np.savez('./data/trained/embeds3d.npz', embeds3d = embeds)
-embeds = torch.FloatTensor(embeds)
-labels = torch.FloatTensor(labels)
+print(embeds.shape)
+np.savez('./data/trained/embeds.npz', embeds = embeds)
+train_embs = embeds[0, idx_train]
+print(train_embs.shape)
+val_embs = embeds[0, idx_val]
+test_embs = embeds[0, idx_test]
 
-# train_embs = embeds[idx_train, :, :]
-# val_embs = embeds[idx_val, :, :]
-# test_embs = embeds[idx_test, :, :]
-# train_lbls = labels[idx_train, :, :]
-# val_lbls = labels[idx_val, :, :]
-# test_lbls = labels[idx_test, :, :]
+train_lbls = torch.argmax(labels[0, idx_train], dim=1)
+val_lbls = torch.argmax(labels[0, idx_val], dim=1)
+test_lbls = torch.argmax(labels[0, idx_test], dim=1)
+print(train_lbls.shape)
 
-cost = 0
-nb_testings = 1
-for _ in range(nb_testings):
-    multReg = MultipleRegression(embeds.shape[2])
-    opt = torch.optim.Adam(multReg.parameters(), lr=0.01, weight_decay=0.0)
-    # multReg.cuda()
 
+tot = torch.zeros(1)
+tot = tot.cuda()
+
+accs = []
+
+for _ in range(50):
+    log = LogReg(hid_units, nb_classes)
+    opt = torch.optim.Adam(log.parameters(), lr=0.01, weight_decay=0.0)
+    log.cuda()
+
+    pat_steps = 0
+    best_acc = torch.zeros(1)
+    best_acc = best_acc.cuda()
     for _ in range(100):
-        multReg.train()
+        log.train()
         opt.zero_grad()
 
-        # logits = multReg(train_embs)
-        # loss = mae_loss(logits, train_lbls)
-        logits = multReg(embeds)
-        loss = mae_loss(logits, labels)
+        logits = log(train_embs)
+        loss = xent(logits, train_lbls)
+        
         loss.backward()
         opt.step()
 
-    # preds = multReg(test_embs)
-    # cost += abs(preds - test_lbls)/test_lbls
-    preds = multReg(embeds)
-    cost += abs(preds - labels)/labels
+    logits = log(test_embs)
+    preds = torch.argmax(logits, dim=1)
+    acc = torch.sum(preds == test_lbls).float() / test_lbls.shape[0]
+    accs.append(acc * 100)
+    print(acc)
+    tot += acc
 
-ebs = preds.detach().numpy()
-ebs = np.squeeze(ebs)
-np.savez('./data/trained/embeds.npz', embeds = ebs)
+print('Average accuracy:', tot / 50)
 
+accs = torch.stack(accs)
+print(accs.mean())
+print(accs.std())
