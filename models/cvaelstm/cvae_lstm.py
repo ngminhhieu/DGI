@@ -175,7 +175,7 @@ class VRAE(BaseEstimator, nn.Module):
     :param max_grad_norm: The grad-norm to be clipped
     :param dload: Download directory where models are to be dumped
     """
-    def __init__(self, sequence_length, number_of_features, output_dim=1, hidden_size=90, hidden_layer_depth=2, latent_length=20,
+    def __init__(self, sequence_length, number_of_features, patience=15, output_dim=1, hidden_size=90, hidden_layer_depth=2, latent_length=20,
                  batch_size=32, learning_rate=0.005, block='LSTM',
                  n_epochs=5, dropout_rate=0., optimizer='Adam', loss='MSELoss',
                  cuda=False, print_every=100, clip=True, max_grad_norm=5, dload='.', conditional=False):
@@ -223,6 +223,7 @@ class VRAE(BaseEstimator, nn.Module):
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.n_epochs = n_epochs
+        self.patience = patience
 
         self.print_every = print_every
         self.clip = clip
@@ -307,17 +308,16 @@ class VRAE(BaseEstimator, nn.Module):
 
         epoch_loss = 0
         t = 0
+        best = 1e9
+        patience = 0
 
         for t, X in enumerate(train_loader):
 
             # Index first element of array to return tensor
             X = X[0]
-            print('Hereeee')
-            print(X.shape)
 
             # required to swap axes, since dataloader gives output in (batch_size x seq_len x num_of_features)
             X = X.permute(1,0,2)
-            print(X.shape)
 
             self.optimizer.zero_grad()
             loss, recon_loss, kl_loss, _ = self.compute_loss(X)
@@ -328,6 +328,16 @@ class VRAE(BaseEstimator, nn.Module):
 
             # accumulator
             epoch_loss += loss.item()
+            if loss.item() < best:
+                best = loss.item()
+                patience = 0
+                self.save('best_cvae_lstm.pkl')
+            else:
+                patience += 1
+            
+            if patience == self.patience:
+                print("Early Stopping!")
+                break
 
             self.optimizer.step()
 
@@ -338,7 +348,7 @@ class VRAE(BaseEstimator, nn.Module):
         print('Average loss: {:.4f}'.format(epoch_loss / t))
 
 
-    def fit(self, dataset, save = False):
+    def fit(self, dataset):
         """
         Calls `_train` function over a fixed number of epochs, specified by `n_epochs`
 
@@ -358,8 +368,6 @@ class VRAE(BaseEstimator, nn.Module):
             self._train(train_loader)
 
         self.is_fitted = True
-        if save:
-            self.save('model.pth')
 
 
     def _batch_transform(self, x):
@@ -388,7 +396,7 @@ class VRAE(BaseEstimator, nn.Module):
 
         return x_decoded.cpu().data.numpy()
 
-    def reconstruct(self, dataset, save = False):
+    def reconstruct(self, dataset, save = True):
         """
         Given input dataset, creates dataloader, runs dataloader on `_batch_reconstruct`
         Prerequisite is that model has to be fit
@@ -424,12 +432,13 @@ class VRAE(BaseEstimator, nn.Module):
                     else:
                         os.mkdir(self.dload)
                     x_decoded.dump(self.dload + '/z_run.pkl')
+
                 return x_decoded
 
         raise RuntimeError('Model needs to be fit')
 
 
-    def transform(self, dataset, save = False):
+    def transform(self, dataset, save = True):
         """
         Given input dataset, creates dataloader, runs dataloader on `_batch_transform`
         Prerequisite is that model has to be fit
@@ -466,7 +475,7 @@ class VRAE(BaseEstimator, nn.Module):
 
         raise RuntimeError('Model needs to be fit')
 
-    def fit_transform(self, dataset, save = False):
+    def fit_transform(self, dataset, save = True):
         """
         Combines the `fit` and `transform` functions above
 
@@ -474,7 +483,7 @@ class VRAE(BaseEstimator, nn.Module):
         :param bool save: If true, dumps the model and latent vectors as pickle file
         :return: latent vectors for input dataset
         """
-        self.fit(dataset, save = save)
+        self.fit(dataset)
         return self.transform(dataset, save = save)
 
     def save(self, file_name):

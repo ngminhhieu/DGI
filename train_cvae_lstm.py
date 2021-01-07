@@ -26,11 +26,12 @@ normalized_val, _ = standardizeData(val_data, sc)
 normalized_test, _ = standardizeData(test_data, sc)
 
 sequence_length = 14
-number_of_features = train_data.shape[1]
+number_of_features = train_data.shape[1]-1
 horizon = 1
 
 trainX, trainY = getData(normalized_train, sequence_length, horizon)
 valX, valY = getData(normalized_val, sequence_length, horizon)
+valX_0 = valX
 testX, testY = getData(normalized_test, sequence_length, horizon)
 trainY = trainY[:, 0, :]
 valY = valY[:, 0, :]
@@ -42,25 +43,27 @@ valY = TensorDataset(torch.from_numpy(valY))
 testX = TensorDataset(torch.from_numpy(testX))
 testY = TensorDataset(torch.from_numpy(testY))
 
-dload = './model_dir'
+dload = './log/cvae_lstm'
 hidden_size = 90
 hidden_layer_depth = 1
 latent_length = 20
 batch_size = 32
 learning_rate = 0.0005
-n_epochs = 40
+n_epochs = 1
 dropout_rate = 0.2
 optimizer = 'Adam' # options: ADAM, SGD
 cuda = True # options: True, False
 print_every=30
 clip = True # options: True, False
 max_grad_norm=5
+patience = 15
 loss = 'MSELoss' # options: SmoothL1Loss, MSELoss
 block = 'LSTM' # options: LSTM, GRU
-conditional = True
+conditional = False
 
 vrae = VRAE(sequence_length=sequence_length,
             number_of_features = number_of_features,
+            patience = patience,
             hidden_size = hidden_size, 
             hidden_layer_depth = hidden_layer_depth,
             latent_length = latent_length,
@@ -79,11 +82,14 @@ vrae = VRAE(sequence_length=sequence_length,
             conditional = conditional)
 
 vrae.fit(trainX)
+vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
 z_run = vrae.reconstruct(valX)
-valX = valX[:z_run.shape(0)]
-
-plt.plot(z_run, label='generation')
-plt.plot(valX, label='groundtruth')
-plt.savefig('./cvae_lstm/cvae_lstm.png')
+z_run = np.swapaxes(z_run,0,1)
+valX_0 = valX_0[:z_run.shape[0]]
+z_run = z_run.reshape(-1, z_run.shape[-1])
+valX_0 = valX_0.reshape(-1, valX_0.shape[-1])
+plt.plot(z_run[:, 1], label='generation')
+plt.plot(valX_0[:, 1], label='groundtruth')
+plt.savefig(dload + '/cvae_lstm.png')
 plt.legend()
 plt.close()
