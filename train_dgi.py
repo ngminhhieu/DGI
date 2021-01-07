@@ -27,7 +27,6 @@ pm_dataset = pm_dataset.replace("**", 0)
 pm_dataset = pm_dataset.to_numpy()
 pm_data = pm_dataset[:, 4:]
 pm_data = pm_data.astype(np.float)
-pm_data = pm_data[:10]
 
 adj = process.build_graph('./data/locations.csv')
 idx_train, idx_val, idx_test = process.train_valid_test(pm_data, 0.6, 0.2)
@@ -82,7 +81,7 @@ for i in range(len(pm_data)):
     if torch.cuda.is_available():
         features = features.cuda()
 
-    for epoch in range(1):
+    for epoch in range(nb_epochs):
         model.train()
         optimiser.zero_grad()
 

@@ -26,7 +26,7 @@ normalized_val, _ = standardizeData(val_data, sc)
 normalized_test, _ = standardizeData(test_data, sc)
 
 sequence_length = 14
-number_of_features = train_data.shape[1]
+number_of_features = train_data.shape[1] - 1
 horizon = 1
 
 trainX, trainY = getData(normalized_train, sequence_length, horizon)
@@ -57,7 +57,7 @@ clip = True # options: True, False
 max_grad_norm=5
 loss = 'MSELoss' # options: SmoothL1Loss, MSELoss
 block = 'LSTM' # options: LSTM, GRU
-conditional = True
+conditional = False
 
 vrae = VRAE(sequence_length=sequence_length,
             number_of_features = number_of_features,

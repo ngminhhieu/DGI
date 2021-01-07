@@ -312,12 +312,9 @@ class VRAE(BaseEstimator, nn.Module):
 
             # Index first element of array to return tensor
             X = X[0]
-            print('Hereeee')
-            print(X.shape)
 
             # required to swap axes, since dataloader gives output in (batch_size x seq_len x num_of_features)
             X = X.permute(1,0,2)
-            print(X.shape)
 
             self.optimizer.zero_grad()
             loss, recon_loss, kl_loss, _ = self.compute_loss(X)
