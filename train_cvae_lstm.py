@@ -26,7 +26,7 @@ normalized_val, _ = standardizeData(val_data, sc)
 normalized_test, _ = standardizeData(test_data, sc)
 
 sequence_length = 14
-number_of_features = train_data.shape[1]-1
+number_of_features = train_data.shape[1] - 1
 horizon = 1
 
 trainX, trainY = getData(normalized_train, sequence_length, horizon)
