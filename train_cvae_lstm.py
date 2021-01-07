@@ -8,10 +8,15 @@ from torch.utils.data import DataLoader, TensorDataset
 from utils.cvaelstm.process import train_val_test_split, getData, standardizeData
 # plotly.offline.init_notebook_mode()
 
-pm_dataset = np.load('./data/trained/embeds.npz')['embeds']
+# pm_data = np.load('./data/trained/embeds.npz')['embeds']
+pm_dataset = pd.read_csv('./data/pm.csv')
+pm_dataset = pm_dataset.replace("**", 0)
+pm_dataset = pm_dataset.to_numpy()
+pm_data = pm_dataset[:, 4:]
+pm_data = pm_data.astype(np.float)
 
 # Perform the train validation split
-train_data, val_data, test_data = train_val_test_split(pm_dataset, valid_size=0.2, test_size=0.2)
+train_data, val_data, test_data = train_val_test_split(pm_data, valid_size=0.2, test_size=0.2)
 
 # Standardize the data to bring the inputs on a uniform scale
 normalized_train, sc = standardizeData(train_data, train = True)
