@@ -6,6 +6,8 @@ import plotly
 import sys
 from torch.utils.data import DataLoader, TensorDataset
 from utils.cvaelstm.process import train_val_test_split, getData, standardizeData
+import matplotlib.pyplot as plt
+
 # plotly.offline.init_notebook_mode()
 
 # pm_data = np.load('./data/trained/embeds.npz')['embeds']
@@ -25,12 +27,11 @@ normalized_test, _ = standardizeData(test_data, sc)
 
 sequence_length = 14
 number_of_features = train_data.shape[1]
-output_dim = 1
 horizon = 1
 
-trainX, trainY = getData(normalized_train, sequence_length, horizon, output_dim)
-valX, valY = getData(normalized_val, sequence_length, horizon, output_dim)
-testX, testY = getData(normalized_test, sequence_length, horizon, output_dim)
+trainX, trainY = getData(normalized_train, sequence_length, horizon)
+valX, valY = getData(normalized_val, sequence_length, horizon)
+testX, testY = getData(normalized_test, sequence_length, horizon)
 trainY = trainY[:, 0, :]
 valY = valY[:, 0, :]
 testY = testY[:, 0, :]
@@ -43,7 +44,6 @@ testY = TensorDataset(torch.from_numpy(testY))
 
 dload = './model_dir'
 hidden_size = 90
-output_dim = 1
 hidden_layer_depth = 1
 latent_length = 20
 batch_size = 32
@@ -61,7 +61,6 @@ conditional = True
 
 vrae = VRAE(sequence_length=sequence_length,
             number_of_features = number_of_features,
-            output_dim = output_dim,
             hidden_size = hidden_size, 
             hidden_layer_depth = hidden_layer_depth,
             latent_length = latent_length,
@@ -80,4 +79,11 @@ vrae = VRAE(sequence_length=sequence_length,
             conditional = conditional)
 
 vrae.fit(trainX)
-z_run = vrae.transform(valX)
+z_run = vrae.reconstruct(valX)
+valX = valX[:z_run.shape(0)]
+
+plt.plot(z_run, label='generation')
+plt.plot(valX, label='groundtruth')
+plt.savefig('./cvae_lstm/cvae_lstm.png')
+plt.legend()
+plt.close()

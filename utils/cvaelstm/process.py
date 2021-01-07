@@ -7,13 +7,13 @@ import matplotlib.pyplot as plt
 import streamlit as st
 plt.style.use("fivethirtyeight")
 
-def getData(dataset, sequence_length, horizon, output_dim):
+def getData(dataset, sequence_length, horizon, output_dim=1):
     
     T = dataset.shape[0]-sequence_length-horizon
-    ips = np.empty(shape=(T, sequence_length, dataset.shape[1]))
+    ips = np.empty(shape=(T, sequence_length, dataset.shape[1]-output_dim))
     ops = np.empty(shape=(T, horizon, output_dim))
     for i in range(T):
-        ips[i, :, :] = dataset[i:i+sequence_length]
+        ips[i, :, :] = dataset[i:i+sequence_length, 0:(dataset.shape[1]-output_dim)]
         ops[i, :, :] = dataset[i+sequence_length:i+sequence_length+horizon, -output_dim]
 
     return ips, ops
