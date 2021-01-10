@@ -44,19 +44,19 @@ testX = TensorDataset(torch.from_numpy(testX))
 testY = TensorDataset(torch.from_numpy(testY))
 
 dload = './log/cvae_lstm'
-hidden_size = 90
+hidden_size = 512
 hidden_layer_depth = 1
 latent_length = 20
-batch_size = 32
-learning_rate = 0.0005
-n_epochs = 1
-dropout_rate = 0.2
+batch_size = 256
+learning_rate = 0.0001
+n_epochs = 500
+dropout_rate = 0
 optimizer = 'Adam' # options: ADAM, SGD
 cuda = True # options: True, False
 print_every=30
 clip = True # options: True, False
 max_grad_norm=5
-patience = 15
+patience = 100
 loss = 'MSELoss' # options: SmoothL1Loss, MSELoss
 block = 'LSTM' # options: LSTM, GRU
 conditional = False
@@ -88,8 +88,8 @@ z_run = np.swapaxes(z_run,0,1)
 valX_0 = valX_0[:z_run.shape[0]]
 z_run = z_run.reshape(-1, z_run.shape[-1])
 valX_0 = valX_0.reshape(-1, valX_0.shape[-1])
-plt.plot(z_run[:, 1], label='generation')
-plt.plot(valX_0[:, 1], label='groundtruth')
+plt.plot(z_run[:200, 1], label='generation')
+plt.plot(valX_0[:200, 1], label='groundtruth')
 plt.savefig(dload + '/cvae_lstm.png')
 plt.legend()
 plt.close()
