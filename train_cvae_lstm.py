@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 
 # plotly.offline.init_notebook_mode()
 
-# pm_data = np.load('./data/trained/embeds.npz')['embeds']
-pm_dataset = pd.read_csv('./data/pm.csv')
+# pm_data = np.load('./log/dgi/trained/embeds.npz')['embeds']
+pm_dataset = pd.read_csv('./data/cvae_lstm/pm.csv')
 pm_dataset = pm_dataset.replace("**", 0)
 pm_dataset = pm_dataset.to_numpy()
 pm_data = pm_dataset[:, 4:]

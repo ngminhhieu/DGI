@@ -10,7 +10,7 @@ from utils.dgi import process
 import sys
 
 dataset = 'cora'
-
+log_dgi = "./log/dgi/trained"
 # training params
 batch_size = 1
 nb_epochs = 10000
@@ -22,13 +22,13 @@ hid_units = 512
 sparse = True
 nonlinearity = 'prelu' # special name to separate parameters
 
-pm_dataset = pd.read_csv('./data/pm.csv')
+pm_dataset = pd.read_csv('./dgi/pm.csv')
 pm_dataset = pm_dataset.replace("**", 0)
 pm_dataset = pm_dataset.to_numpy()
 pm_data = pm_dataset[:, 4:]
 pm_data = pm_data.astype(np.float)
 
-adj = process.build_graph('./data/locations.csv')
+adj = process.build_graph('./data/dgi/locations.csv')
 idx_train, idx_val, idx_test = process.train_valid_test(pm_data, 0.6, 0.2)
 
 adj = process.normalize_adj(adj + sp.eye(adj.shape[0]))
@@ -108,7 +108,7 @@ for i in range(len(pm_data)):
             best = loss
             best_t = epoch
             cnt_wait = 0
-            torch.save(model.state_dict(), './data/trained/best_dgi.pkl')
+            torch.save(model.state_dict(), log_dgi+'/best_dgi.pkl')
         else:
             cnt_wait += 1
 
@@ -122,10 +122,10 @@ for i in range(len(pm_data)):
         optimiser.step()
 
     print('Loading {}th epoch'.format(best_t))
-    model.load_state_dict(torch.load('./data/trained/best_dgi.pkl'))
+    model.load_state_dict(torch.load(log_dgi+'/best_dgi.pkl'))
     embeds[i, :, :], _ = model.embed(features, sp_adj if sparse else adj, sparse, None)
 
-np.savez('./data/trained/embeds3d.npz', embeds3d = embeds)
+np.savez(log_dgi+'/embeds3d.npz', embeds3d = embeds)
 embeds = torch.FloatTensor(embeds)
 labels = torch.FloatTensor(labels)
 
@@ -161,5 +161,4 @@ for _ in range(nb_testings):
 
 ebs = preds.detach().numpy()
 ebs = np.squeeze(ebs)
-np.savez('./data/trained/embeds.npz', embeds = ebs)
-
+np.savez(log_dgi+'/embeds.npz', embeds = ebs)
