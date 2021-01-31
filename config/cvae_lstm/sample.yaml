@@ -1,0 +1,29 @@
+alg: cave_lstm
+base_dir: log/cave_lstm/
+log_level: INFO
+gpu: 0
+data:
+  batch_size: 200
+  test_batch_size: 1
+  dataset: data/cave_lstm/pm.csv
+  test_size: 0.2
+  valid_size: 0.2
+model:
+  hidden_size: 512
+  hidden_layer_depth: 1
+  latent_length: 20
+  learning_rate: 0.0001
+  cuda: True 
+  print_every: 30
+  clip: True 
+  max_grad_norm: 5
+  loss: 'MSELoss' 
+  block: 'LSTM' 
+  conditional: False
+train:
+  dropout_rate: 0
+  n_epochs: 300
+  optimizer: 'Adam'
+  patience: 15
+test:
+  run_times: 1
