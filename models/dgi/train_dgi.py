@@ -17,28 +17,28 @@ def PrepareData(pm_dataset):
     pm_data = pm_data.astype(np.float)
     return pm_data
 
-# take the dataset 
-pm_dataset = pd.read_csv('./data/dgi/pm.csv')
-pm_data = PrepareData(pm_dataset)
-
-adj = process.build_graph('./data/dgi/locations.csv')
-idx_train, idx_val, idx_test = process.train_valid_test(pm_data, 0.6, 0.2)
-
-adj = process.normalize_adj(adj + sp.eye(adj.shape[0]))
-
-if sparse:
-    sp_adj = process.sparse_mx_to_torch_sparse_tensor(adj)
-else:
-    adj = (adj + sp.eye(adj.shape[0])).todense()
-
-if not sparse:
-    adj = torch.FloatTensor(adj[np.newaxis])
-idx_train = torch.LongTensor(idx_train)
-idx_val = torch.LongTensor(idx_val)
-idx_test = torch.LongTensor(idx_test)
 
 class ConfigDGI:
     def __init__(self, **kwargs):
+        pm_dataset = pd.read_csv('./data/dgi/pm.csv')
+        pm_data = PrepareData(pm_dataset)
+
+        adj = process.build_graph('./data/dgi/locations.csv')
+        idx_train, idx_val, idx_test = process.train_valid_test(pm_data, 0.6, 0.2)
+
+        adj = process.normalize_adj(adj + sp.eye(adj.shape[0]))
+        sparse = True
+        if sparse:
+            sp_adj = process.sparse_mx_to_torch_sparse_tensor(adj)
+        else:
+            adj = (adj + sp.eye(adj.shape[0])).todense()
+
+        if not sparse:
+            adj = torch.FloatTensor(adj[np.newaxis])
+        idx_train = torch.LongTensor(idx_train)
+        idx_val = torch.LongTensor(idx_val)
+        idx_test = torch.LongTensor(idx_test)
+
         self._kwargs = kwargs
         self._model_kwargs = kwargs.get('model')
         self._data_kwargs = kwargs.get('data')
@@ -55,17 +55,6 @@ class ConfigDGI:
         hid_units = self._model_kwargs.get('hid_units')
         sparse = self._model_kwargs.get('sparse')
         nonlinearity = self._model_kwargs.get('nonlinearity') # special name to separate parameters
-
-        if torch.cuda.is_available():
-            print('Using CUDA')
-            if sparse:
-                sp_adj = sp_adj.cuda()
-            else:
-                adj = adj.cuda()
-            idx_train = idx_train.cuda()
-            idx_val = idx_val.cuda()
-            idx_test = idx_test.cuda()
-
         mae_loss = nn.L1Loss()
         b_xent = nn.BCEWithLogitsLoss()
         xent = nn.CrossEntropyLoss()
@@ -88,7 +77,16 @@ class ConfigDGI:
             model = DGI(ft_size, hid_units, nonlinearity)
             optimiser = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2_coef)
             if torch.cuda.is_available():
-                features = features.cuda()
+              model.cuda()
+              features = features.cuda()
+              if sparse:
+                  sp_adj = sp_adj.cuda()
+              else:
+                  adj = adj.cuda()
+              idx_train = idx_train.cuda()
+              idx_val = idx_val.cuda()
+              idx_test = idx_test.cuda()
+
 
             for epoch in range(nb_epochs):
                 model.train()
@@ -132,7 +130,7 @@ class ConfigDGI:
 
             print('Loading {}th epoch'.format(best_t))
             model.load_state_dict(torch.load(log_dgi+'/best_dgi.pkl'))
-            embeds[i, :, :], _ = model.embed(features, sp_adj if sparse else adj, sparse, None)
+            embeds[i, :, :] = model.embed(features, sp_adj if sparse else adj, sparse, None)[0].cpu()
 
         np.savez(log_dgi+'/embeds3d.npz', embeds3d = embeds)
         embeds = torch.FloatTensor(embeds)
