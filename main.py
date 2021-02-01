@@ -6,7 +6,7 @@ import numpy as np
 import yaml
 import random as rn
 from models.cvaelstm.train_cvae_lstm import ConfigCvaeLstm
-# from models.dgi.train_dgi import ConfigDGI
+from models.dgi.train_dgi import ConfigDGI
 
 def seed():
 
