@@ -57,11 +57,14 @@ class Lambda(nn.Module):
     :param hidden_size: hidden size of the encoder
     :param latent_length: latent vector length
     """
-    def __init__(self, hidden_size, latent_length):
+    def __init__(self, hidden_size, latent_length, conditional, condition_dim):
         super(Lambda, self).__init__()
-
         self.hidden_size = hidden_size
-        self.latent_length = latent_length
+
+        if conditional:
+            self.latent_length = self.latent_length + condition_dim
+        else:
+            self.latent_length = latent_length
 
         self.hidden_to_mean = nn.Linear(self.hidden_size, self.latent_length)
         self.hidden_to_logvar = nn.Linear(self.hidden_size, self.latent_length)
@@ -98,7 +101,7 @@ class Decoder(nn.Module):
     :param block: GRU/LSTM - use the same which you've used in the encoder
     :param dtype: Depending on cuda enabled/disabled, create the tensor
     """
-    def __init__(self, sequence_length, output_dim, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, conditional, block='LSTM'):
+    def __init__(self, sequence_length, output_dim, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, conditional, condition_dim, block='LSTM'):
 
         super(Decoder, self).__init__()
 
@@ -106,10 +109,13 @@ class Decoder(nn.Module):
         self.batch_size = batch_size
         self.sequence_length = sequence_length
         self.hidden_layer_depth = hidden_layer_depth
-        self.latent_length = latent_length
         self.output_size = output_size
         self.dtype = dtype
         self.conditional = conditional
+        if self.conditional:
+            self.latent_length = latent_length + condition_dim
+        else:
+            self.latent_length = latent_length
 
         if block == 'LSTM':
             self.model = nn.LSTM(output_dim, self.hidden_size, self.hidden_layer_depth)
@@ -396,7 +402,7 @@ class VRAE(BaseEstimator, nn.Module):
 
         return x_decoded.cpu().data.numpy()
 
-    def reconstruct(self, dataset, save = True):
+    def reconstruct(self, dataset, conditional, condition, save = True):
         """
         Given input dataset, creates dataloader, runs dataloader on `_batch_reconstruct`
         Prerequisite is that model has to be fit
@@ -420,6 +426,8 @@ class VRAE(BaseEstimator, nn.Module):
                 for t, x in enumerate(test_loader):
                     x = x[0]
                     x = x.permute(1, 0, 2)
+                    if conditional:
+                        x = torch.cat((x, condition), dim=-1)
 
                     x_decoded_each = self._batch_reconstruct(x)
                     x_decoded.append(x_decoded_each)

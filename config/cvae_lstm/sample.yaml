@@ -19,10 +19,10 @@ model:
   max_grad_norm: 5
   loss: 'MSELoss' 
   block: 'LSTM' 
-  conditional: False
+  conditional: True
 train:
   dropout_rate: 0
-  n_epochs: 300
+  n_epochs: 3
   optimizer: 'Adam'
   patience: 15
 test:

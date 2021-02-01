@@ -13,7 +13,7 @@ def PrepareData(pm_dataset):
       # pm_data = np.load('./log/dgi/trained/embeds.npz')['embeds']
       pm_dataset = pm_dataset.replace("**", 0)
       pm_dataset = pm_dataset.to_numpy()
-      pm_data = pm_dataset[:, 4:]
+      pm_data = pm_dataset[:, 4:10].copy()
       pm_data = pm_data.astype(np.float)
       return pm_data
 
@@ -40,11 +40,13 @@ class ConfigCvaeLstm:
 
             trainX, trainY = getData(normalized_train, self.sequence_length, horizon)
             valX, valY = getData(normalized_val, self.sequence_length, horizon)
-            self.valX_0 = valX
             testX, testY = getData(normalized_test, self.sequence_length, horizon)
-            trainY = trainY[:, 0, :]
-            valY = valY[:, 0, :]
-            testY = testY[:, 0, :]
+            trainX = trainX[:, :-1, :]
+            valX = valX[:, -1, :]
+            testX = testX[:, -1, :]
+            trainY = trainY[:, -1, :]
+            valY = valY[:, -1, :]
+            testY = testY[:, -1, :]
             self.trainX = TensorDataset(torch.from_numpy(trainX))
             self.trainY = TensorDataset(torch.from_numpy(trainY))
             self.valX = TensorDataset(torch.from_numpy(valX))
@@ -94,15 +96,17 @@ class ConfigCvaeLstm:
                         dload = self.dload,
                         conditional = self.conditional)
 
-            vrae.fit(self.trainX)
+            location_df = pd.read_csv('./data/cvae_lstm/locations.csv').to_numpy()
+            location_lat = location[1]
+            vrae.fit(self.trainX, conditional=self.conditional, condition=location_lat)
             vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
-            z_run = vrae.reconstruct(self.valX)
+            z_run = vrae.reconstruct(self.valX, conditional=self.conditional, condition=location_lat)
             z_run = np.swapaxes(z_run,0,1)
-            valX_0 = self.valX_0[:z_run.shape[0]]
+            valY = self.valY[:z_run.shape[0]]
             z_run = z_run.reshape(-1, z_run.shape[-1])
-            valX_0 = valX_0.reshape(-1, valX_0.shape[-1])
+            valY = valY.reshape(-1, valY.shape[-1])
             plt.plot(z_run[:200, 1], label='generation')
-            plt.plot(valX_0[:200, 1], label='groundtruth')
+            plt.plot(valY[:200, 1], label='groundtruth')
             plt.savefig(self.dload + '/cvae_lstm.png')
             plt.legend()
             plt.close()
