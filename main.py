@@ -32,15 +32,17 @@ if __name__ == '__main__':
         config = yaml.load(f)
 
     if args.mode == 'cvae_lstm_train':
-        model = ConfigCvaeLstm(**config)
-
+        model = ConfigCvaeLstm(is_training=True,**config)
+        model.train()
     elif args.mode == 'cvae_lstm_test':
         # predict
-        model = ConfigCvaeLstm(**config)
-        # model.test()
+        model = ConfigCvaeLstm(is_training=False,**config)
+        model.test()
     elif args.mode == 'dgi_train':
-        model = ConfigDGI(**config)
+        model = ConfigDGI(is_training=True,**config)
+        model.train()
     elif args.mode == 'dgi_test':
-        model = ConfigDGI(**config)
+        model = ConfigDGI(is_training=False,**config)
+        model.test()
     else:
         raise RuntimeError("Mode needs to be train/test!")
