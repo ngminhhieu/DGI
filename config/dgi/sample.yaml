@@ -1,0 +1,24 @@
+alg: cave_lstm
+log_level: INFO
+log_dgi: "./log/dgi/trained"
+gpu: 0
+data:
+  batch_size: 1
+  test_batch_size: 1
+  dataset: 'cora'
+  test_size: 0.2
+  valid_size: 0.2
+model:
+  lr: 0.001
+  l2_coef: 0.0
+  drop_prob: 0.0
+  hid_units: 512
+  sparse: True
+  nonlinearity: 'prelu'
+train:
+  dropout: 0
+  nb_epochs: 300
+  optimizer: adam
+  patience: 15
+test:
+  run_times: 1
