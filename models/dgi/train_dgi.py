@@ -37,7 +37,7 @@ idx_train = torch.LongTensor(idx_train)
 idx_val = torch.LongTensor(idx_val)
 idx_test = torch.LongTensor(idx_test)
 
-class ConfigCvaeLstm:
+class ConfigDGI:
     def __init__(self, **kwargs):
         self._kwargs = kwargs
         self._model_kwargs = kwargs.get('model')
