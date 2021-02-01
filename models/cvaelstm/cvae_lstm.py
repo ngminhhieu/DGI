@@ -57,12 +57,12 @@ class Lambda(nn.Module):
     :param hidden_size: hidden size of the encoder
     :param latent_length: latent vector length
     """
-    def __init__(self, hidden_size, latent_length, conditional, condition_dim):
+    def __init__(self, hidden_size, latent_length, conditional, condition):
         super(Lambda, self).__init__()
         self.hidden_size = hidden_size
 
         if conditional:
-            self.latent_length = self.latent_length + condition_dim
+            self.latent_length = self.latent_length + len(condition)
         else:
             self.latent_length = latent_length
 
@@ -101,7 +101,7 @@ class Decoder(nn.Module):
     :param block: GRU/LSTM - use the same which you've used in the encoder
     :param dtype: Depending on cuda enabled/disabled, create the tensor
     """
-    def __init__(self, sequence_length, output_dim, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, conditional, condition_dim, block='LSTM'):
+    def __init__(self, sequence_length, output_dim, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, conditional, condition, block='LSTM'):
 
         super(Decoder, self).__init__()
 
@@ -113,7 +113,7 @@ class Decoder(nn.Module):
         self.dtype = dtype
         self.conditional = conditional
         if self.conditional:
-            self.latent_length = latent_length + condition_dim
+            self.latent_length = latent_length + len(condition)
         else:
             self.latent_length = latent_length
 
@@ -181,14 +181,14 @@ class VRAE(BaseEstimator, nn.Module):
     :param max_grad_norm: The grad-norm to be clipped
     :param dload: Download directory where models are to be dumped
     """
-    def __init__(self, sequence_length, number_of_features, patience=15, output_dim=1, hidden_size=90, hidden_layer_depth=2, latent_length=20,
+    def __init__(self, sequence_length, condition, number_of_features, patience=15, output_dim=1, hidden_size=90, hidden_layer_depth=2, latent_length=20,
                  batch_size=32, learning_rate=0.005, block='LSTM',
                  n_epochs=5, dropout_rate=0., optimizer='Adam', loss='MSELoss',
                  cuda=False, print_every=100, clip=True, max_grad_norm=5, dload='.', conditional=False):
 
         super(VRAE, self).__init__()
 
-
+        self.conditional = conditional
         self.dtype = torch.FloatTensor
         self.use_cuda = cuda
 
@@ -258,16 +258,16 @@ class VRAE(BaseEstimator, nn.Module):
                 batch_size=self.batch_size,
                 cuda=self.use_cuda)
 
-    def forward(self, x, c=None):
+    def forward(self, x, conditional, condition):
         """
         Forward propagation which involves one pass from inputs to encoder to lambda to decoder
 
         :param x:input tensor
         :return: the decoded output, latent vector
         """
-        cell_output = self.encoder(x, c)
-        latent = self.lmbd(cell_output)
-        x_decoded = self.decoder(latent, c)
+        cell_output = self.encoder(x, None)
+        latent = self.lmbd(cell_output, conditional, condition)
+        x_decoded = self.decoder(latent, condition)
 
         return x_decoded, latent
 
@@ -297,7 +297,7 @@ class VRAE(BaseEstimator, nn.Module):
         """
         x = Variable(X[:,:,:].type(self.dtype), requires_grad = True)
 
-        x_decoded, _ = self(x)
+        x_decoded, _ = self(x, self.conditional, self.condition)
         loss, recon_loss, kl_loss = self._rec(x_decoded, x.detach(), self.loss_fn)
 
         return loss, recon_loss, kl_loss, x
@@ -402,7 +402,7 @@ class VRAE(BaseEstimator, nn.Module):
 
         return x_decoded.cpu().data.numpy()
 
-    def reconstruct(self, dataset, conditional, condition, save = True):
+    def reconstruct(self, dataset, condition, save = True):
         """
         Given input dataset, creates dataloader, runs dataloader on `_batch_reconstruct`
         Prerequisite is that model has to be fit
@@ -426,10 +426,7 @@ class VRAE(BaseEstimator, nn.Module):
                 for t, x in enumerate(test_loader):
                     x = x[0]
                     x = x.permute(1, 0, 2)
-                    if conditional:
-                        x = torch.cat((x, condition), dim=-1)
-
-                    x_decoded_each = self._batch_reconstruct(x)
+                    x_decoded_each = self._batch_reconstruct(x, self.conditional, condition)
                     x_decoded.append(x_decoded_each)
 
                 x_decoded = np.concatenate(x_decoded, axis=1)
