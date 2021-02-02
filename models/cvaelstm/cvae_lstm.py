@@ -293,7 +293,7 @@ class VRAE(BaseEstimator, nn.Module):
 
         return kl_loss + recon_loss, recon_loss, kl_loss
 
-    def compute_loss(self, X):
+    def compute_loss(self, X, Y):
         """
         Given input tensor, forward propagate, compute the loss, and backward propagate.
         Represents the lifecycle of a single iteration
@@ -301,7 +301,7 @@ class VRAE(BaseEstimator, nn.Module):
         :param X: Input tensor
         :return: total loss, reconstruction loss, kl-divergence loss and original input
         """
-        x = Variable(X[:,:,:].type(self.dtype), requires_grad = True)
+        y = Variable(Y[:,:,:].type(self.dtype), requires_grad = True)
 
         x_decoded, _ = self(x, self.conditional, self.condition)
         loss, recon_loss, kl_loss = self._rec(x_decoded, x.detach(), self.loss_fn)
@@ -309,7 +309,7 @@ class VRAE(BaseEstimator, nn.Module):
         return loss, recon_loss, kl_loss, x
 
 
-    def _train(self, train_loader):
+    def _train(self, train_input_loader, train_target_loader):
         """
         For each epoch, given the batch_size, run this function batch_size * num_of_batches number of times
 
@@ -323,16 +323,18 @@ class VRAE(BaseEstimator, nn.Module):
         best = 1e9
         patience = 0
 
-        for t, X in enumerate(train_loader):
+        for t, (X, Y) in enumerate(zip(train_input_loader, train_input_loader)):
 
             # Index first element of array to return tensor
             X = X[0]
+            Y = Y[0]
 
             # required to swap axes, since dataloader gives output in (batch_size x seq_len x num_of_features)
             X = X.permute(1,0,2)
+            Y = Y.permute(1,0,2)
 
             self.optimizer.zero_grad()
-            loss, recon_loss, kl_loss, _ = self.compute_loss(X)
+            loss, recon_loss, kl_loss, _ = self.compute_loss(X, Y)
             loss.backward()
 
             if self.clip:
@@ -360,7 +362,7 @@ class VRAE(BaseEstimator, nn.Module):
         print('Average loss: {:.4f}'.format(epoch_loss / t))
 
 
-    def fit(self, dataset):
+    def fit(self, dataset_train_input, dataset_train_target):
         """
         Calls `_train` function over a fixed number of epochs, specified by `n_epochs`
 
@@ -369,7 +371,12 @@ class VRAE(BaseEstimator, nn.Module):
         :return:
         """
 
-        train_loader = DataLoader(dataset = dataset,
+        train_input_loader = DataLoader(dataset = dataset_train_input,
+                                  batch_size = self.batch_size,
+                                  shuffle = True,
+                                  drop_last=True)
+        
+        train_target_loader = DataLoader(dataset = dataset_train_target,
                                   batch_size = self.batch_size,
                                   shuffle = True,
                                   drop_last=True)
@@ -377,7 +384,7 @@ class VRAE(BaseEstimator, nn.Module):
         for i in range(self.n_epochs):
             print('Epoch: %s' % i)
 
-            self._train(train_loader)
+            self._train(train_input_loader, train_target_loader)
 
         self.is_fitted = True
 
