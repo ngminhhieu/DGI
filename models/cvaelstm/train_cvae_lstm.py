@@ -41,7 +41,7 @@ class ConfigCvaeLstm:
             self.trainX = TensorDataset(torch.from_numpy(trainX))
             self.trainY = TensorDataset(torch.from_numpy(trainY))
             self.valX = TensorDataset(torch.from_numpy(valX))
-            self.valY = TensorDataset(torch.from_numpy(valY))
+            self.valY = valY
             self.testX = TensorDataset(torch.from_numpy(testX))
             self.testY = TensorDataset(torch.from_numpy(testY))
             self.number_of_features = trainX.shape[2]
@@ -85,7 +85,6 @@ class ConfigCvaeLstm:
             vrae = VRAE(sequence_length=self.sequence_length,
                         condition = self.location_lat_train,
                         number_of_features = self.number_of_features,
-                        output_dim=1,
                         patience = self.patience,
                         hidden_size = self.hidden_size, 
                         hidden_layer_depth = self.hidden_layer_depth,
@@ -111,8 +110,8 @@ class ConfigCvaeLstm:
             valY = self.valY[:z_run.shape[0]]
             z_run = z_run.reshape(-1, z_run.shape[-1])
             valY = valY.reshape(-1, valY.shape[-1])
-            plt.plot(z_run[:200, 1], label='generation')
-            plt.plot(valY[:200, 1], label='groundtruth')
+            plt.plot(z_run[:, -1], color='blue', label='generation')
+            plt.plot(valY[:, -1], color='red', label='groundtruth')
             plt.savefig(self.dload + '/cvae_lstm.png')
             plt.legend()
             plt.close()

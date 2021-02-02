@@ -301,12 +301,13 @@ class VRAE(BaseEstimator, nn.Module):
         :param X: Input tensor
         :return: total loss, reconstruction loss, kl-divergence loss and original input
         """
+        x = Variable(X[:,:,:].type(self.dtype), requires_grad = True)
         y = Variable(Y[:,:,:].type(self.dtype), requires_grad = True)
 
         x_decoded, _ = self(x, self.conditional, self.condition)
-        loss, recon_loss, kl_loss = self._rec(x_decoded, x.detach(), self.loss_fn)
+        loss, recon_loss, kl_loss = self._rec(x_decoded, y.detach(), self.loss_fn)
 
-        return loss, recon_loss, kl_loss, x
+        return loss, recon_loss, kl_loss, y
 
 
     def _train(self, train_input_loader, train_target_loader):
@@ -323,7 +324,7 @@ class VRAE(BaseEstimator, nn.Module):
         best = 1e9
         patience = 0
 
-        for t, (X, Y) in enumerate(zip(train_input_loader, train_input_loader)):
+        for t, (X, Y) in enumerate(zip(train_input_loader, train_target_loader)):
 
             # Index first element of array to return tensor
             X = X[0]

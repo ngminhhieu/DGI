@@ -22,8 +22,8 @@ model:
   conditional: True
 train:
   dropout_rate: 0
-  n_epochs: 3
+  n_epochs: 500
   optimizer: 'Adam'
-  patience: 15
+  patience: 50
 test:
   run_times: 1
