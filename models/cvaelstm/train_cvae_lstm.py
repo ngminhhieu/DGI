@@ -76,7 +76,7 @@ class ConfigCvaeLstm:
             self.conditional = self._model_kwargs.get('conditional')
 
       def train(self):
-            location_df = pd.read_csv('./data/cvae_lstm/locations.csv').to_numpy()
+            location = pd.read_csv('./data/cvae_lstm/locations.csv').to_numpy()
             location_lat_train = location[1:7]
             location_lat_test = location[7]
             vrae = VRAE(sequence_length=self.sequence_length,
@@ -99,7 +99,6 @@ class ConfigCvaeLstm:
                         block = self.block,
                         dload = self.dload,
                         conditional = self.conditional)
-
             
             vrae.fit(self.trainX)
             vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')

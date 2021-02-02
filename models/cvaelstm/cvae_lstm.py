@@ -41,9 +41,8 @@ class Encoder(nn.Module):
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
-        if self.conditional:
-            print(x.shape)
-            x = torch.cat((x, c), dim=-1)
+        # if self.conditional:
+        #     x = torch.cat((x, c), dim=-1)
         
         _, (h_end, c_end) = self.model(x)
 
@@ -62,7 +61,7 @@ class Lambda(nn.Module):
         self.hidden_size = hidden_size
 
         if conditional:
-            self.latent_length = self.latent_length + len(condition)
+            self.latent_length = latent_length + len(condition)
         else:
             self.latent_length = latent_length
 
@@ -189,6 +188,7 @@ class VRAE(BaseEstimator, nn.Module):
         super(VRAE, self).__init__()
 
         self.conditional = conditional
+        self.condition = condition
         self.dtype = torch.FloatTensor
         self.use_cuda = cuda
 
@@ -209,7 +209,9 @@ class VRAE(BaseEstimator, nn.Module):
                                conditional=conditional)
 
         self.lmbd = Lambda(hidden_size=hidden_size,
-                           latent_length=latent_length)
+                           latent_length=latent_length,
+                           conditional = conditional,
+                           condition = condition)
 
         self.decoder = Decoder(sequence_length=sequence_length,
                                output_dim=output_dim,
@@ -220,6 +222,7 @@ class VRAE(BaseEstimator, nn.Module):
                                output_size=number_of_features,
                                block=block,
                                conditional=conditional,
+                               condition=condition,
                                dtype=self.dtype)
 
         self.sequence_length = sequence_length
@@ -266,7 +269,7 @@ class VRAE(BaseEstimator, nn.Module):
         :return: the decoded output, latent vector
         """
         cell_output = self.encoder(x, None)
-        latent = self.lmbd(cell_output, conditional, condition)
+        latent = self.lmbd(cell_output)
         x_decoded = self.decoder(latent, condition)
 
         return x_decoded, latent
