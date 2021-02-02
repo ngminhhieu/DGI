@@ -85,6 +85,7 @@ class ConfigCvaeLstm:
             vrae = VRAE(sequence_length=self.sequence_length,
                         condition = self.location_lat_train,
                         number_of_features = self.number_of_features,
+                        output_dim=1,
                         patience = self.patience,
                         hidden_size = self.hidden_size, 
                         hidden_layer_depth = self.hidden_layer_depth,
@@ -103,7 +104,7 @@ class ConfigCvaeLstm:
                         dload = self.dload,
                         conditional = self.conditional)
             
-            vrae.fit(self.trainX)
+            vrae.fit(self.trainX, self.trainY)
             vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
             z_run = vrae.reconstruct(self.valX, condition=self.location_lat_test)
             z_run = np.swapaxes(z_run,0,1)
