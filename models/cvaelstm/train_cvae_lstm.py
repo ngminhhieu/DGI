@@ -35,24 +35,17 @@ class ConfigCvaeLstm:
             normalized_test, _ = standardizeData(test_data, sc)
 
             self.sequence_length = 14
-            self.number_of_features = train_data.shape[1] - 1
-            horizon = 1
-
-            trainX, trainY = getData(normalized_train, self.sequence_length, horizon)
-            valX, valY = getData(normalized_val, self.sequence_length, horizon)
-            testX, testY = getData(normalized_test, self.sequence_length, horizon)
-            trainX = trainX[:, :-1, :]
-            valX = valX[:, -1, :]
-            testX = testX[:, -1, :]
-            trainY = trainY[:, -1, :]
-            valY = valY[:, -1, :]
-            testY = testY[:, -1, :]
+            trainX, trainY = getData(normalized_train, self.sequence_length)
+            valX, valY = getData(normalized_val, self.sequence_length)
+            testX, testY = getData(normalized_test, self.sequence_length)
             self.trainX = TensorDataset(torch.from_numpy(trainX))
             self.trainY = TensorDataset(torch.from_numpy(trainY))
             self.valX = TensorDataset(torch.from_numpy(valX))
             self.valY = TensorDataset(torch.from_numpy(valY))
             self.testX = TensorDataset(torch.from_numpy(testX))
             self.testY = TensorDataset(torch.from_numpy(testY))
+            self.number_of_features = trainX.shape[2]
+
             self._kwargs = kwargs
             self._model_kwargs = kwargs.get('model')
             self._data_kwargs = kwargs.get('data')
@@ -74,13 +67,23 @@ class ConfigCvaeLstm:
             self.loss = self._model_kwargs.get('loss') # options: SmoothL1Loss, MSELoss
             self.block = self._model_kwargs.get('block') # options: LSTM, GRU
             self.conditional = self._model_kwargs.get('conditional')
+    
+            location = pd.read_csv('./data/cvae_lstm/locations.csv')
+            location_lat = location.iloc[:, 1].to_numpy()
+            location_lat_train = np.expand_dims(np.array(location_lat[1:7]), axis=0)
+            location_lat_train = np.repeat(location_lat_train, self.batch_size, axis=0)
+            location_lat_test = np.reshape(np.array(location_lat[7]), (1,1))
+            location_lat_test = np.repeat(location_lat_test, self.batch_size, axis=0)
+            self.location_lat_train = torch.from_numpy(location_lat_train)
+            self.location_lat_test = torch.from_numpy(location_lat_test)
+            if self.cuda:
+              self.location_lat_train=self.location_lat_train.cuda()
+              self.location_lat_test=self.location_lat_test.cuda()
 
       def train(self):
-            location = pd.read_csv('./data/cvae_lstm/locations.csv').to_numpy()
-            location_lat_train = location[1:7]
-            location_lat_test = location[7]
+            
             vrae = VRAE(sequence_length=self.sequence_length,
-                        condition = location_lat_train,
+                        condition = self.location_lat_train,
                         number_of_features = self.number_of_features,
                         patience = self.patience,
                         hidden_size = self.hidden_size, 
@@ -102,7 +105,7 @@ class ConfigCvaeLstm:
             
             vrae.fit(self.trainX)
             vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
-            z_run = vrae.reconstruct(self.valX, condition=location_lat_test)
+            z_run = vrae.reconstruct(self.valX, condition=self.location_lat_test)
             z_run = np.swapaxes(z_run,0,1)
             valY = self.valY[:z_run.shape[0]]
             z_run = z_run.reshape(-1, z_run.shape[-1])

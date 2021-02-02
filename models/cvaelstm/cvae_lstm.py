@@ -61,7 +61,7 @@ class Lambda(nn.Module):
         self.hidden_size = hidden_size
 
         if conditional:
-            self.latent_length = latent_length + len(condition)
+            self.latent_length = latent_length + condition.shape[1]
         else:
             self.latent_length = latent_length
 
@@ -100,7 +100,7 @@ class Decoder(nn.Module):
     :param block: GRU/LSTM - use the same which you've used in the encoder
     :param dtype: Depending on cuda enabled/disabled, create the tensor
     """
-    def __init__(self, sequence_length, output_dim, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, conditional, condition, block='LSTM'):
+    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, conditional, condition, block='LSTM'):
 
         super(Decoder, self).__init__()
 
@@ -112,21 +112,21 @@ class Decoder(nn.Module):
         self.dtype = dtype
         self.conditional = conditional
         if self.conditional:
-            self.latent_length = latent_length + len(condition)
+            self.latent_length = latent_length + condition.shape[1]
         else:
             self.latent_length = latent_length
 
         if block == 'LSTM':
-            self.model = nn.LSTM(output_dim, self.hidden_size, self.hidden_layer_depth)
+            self.model = nn.LSTM(1, self.hidden_size, self.hidden_layer_depth)
         elif block == 'GRU':
-            self.model = nn.GRU(output_dim, self.hidden_size, self.hidden_layer_depth)
+            self.model = nn.GRU(1, self.hidden_size, self.hidden_layer_depth)
         else:
             raise NotImplementedError
 
         self.latent_to_hidden = nn.Linear(self.latent_length, self.hidden_size)
         self.hidden_to_output = nn.Linear(self.hidden_size, self.output_size)
 
-        self.decoder_inputs = torch.zeros(self.sequence_length, self.batch_size, output_dim, requires_grad=True).type(self.dtype)
+        self.decoder_inputs = torch.zeros(self.sequence_length, self.batch_size, 1, requires_grad=True).type(self.dtype)
         self.c_0 = torch.zeros(self.hidden_layer_depth, self.batch_size, self.hidden_size, requires_grad=True).type(self.dtype)
 
         nn.init.xavier_uniform_(self.latent_to_hidden.weight)
@@ -138,8 +138,11 @@ class Decoder(nn.Module):
         :param latent: latent vector
         :return: outputs consisting of mean and std dev of vector
         """
-        if self.conditional:
-            latent = torch.cat((latent, c), dim=-1)
+        # if self.conditional:
+        #     print(c.shape)
+        #     print(latent.shape)
+        #     latent = torch.cat((latent, c), dim=-1)
+        #     print(latent.shape)
         h_state = self.latent_to_hidden(latent)
 
         if isinstance(self.model, nn.LSTM):
@@ -214,12 +217,12 @@ class VRAE(BaseEstimator, nn.Module):
                            condition = condition)
 
         self.decoder = Decoder(sequence_length=sequence_length,
-                               output_dim=output_dim,
                                batch_size = batch_size,
                                hidden_size=hidden_size,
                                hidden_layer_depth=hidden_layer_depth,
                                latent_length=latent_length,
-                               output_size=number_of_features,
+                            #    output_size=number_of_features,
+                               output_size=output_dim,
                                block=block,
                                conditional=conditional,
                                condition=condition,
@@ -392,7 +395,7 @@ class VRAE(BaseEstimator, nn.Module):
                     )
         ).cpu().data.numpy()
 
-    def _batch_reconstruct(self, x):
+    def _batch_reconstruct(self, x, condition):
         """
         Passes the given input tensor into encoder, lambda and decoder function
 
@@ -401,7 +404,7 @@ class VRAE(BaseEstimator, nn.Module):
         """
 
         x = Variable(x.type(self.dtype), requires_grad = False)
-        x_decoded, _ = self(x)
+        x_decoded, _ = self(x, self.conditional, condition)
 
         return x_decoded.cpu().data.numpy()
 
@@ -429,7 +432,7 @@ class VRAE(BaseEstimator, nn.Module):
                 for t, x in enumerate(test_loader):
                     x = x[0]
                     x = x.permute(1, 0, 2)
-                    x_decoded_each = self._batch_reconstruct(x, self.conditional, condition)
+                    x_decoded_each = self._batch_reconstruct(x, condition)
                     x_decoded.append(x_decoded_each)
 
                 x_decoded = np.concatenate(x_decoded, axis=1)
