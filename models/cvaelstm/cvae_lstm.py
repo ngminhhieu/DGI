@@ -11,7 +11,6 @@ from utils.cvaelstm.process import BaseEstimator
 class Encoder(nn.Module):
     """
     Encoder network containing enrolled LSTM/GRU
-
     :param number_of_features: number of input features
     :param hidden_size: hidden size of the RNN
     :param hidden_layer_depth: number of layers in RNN
@@ -19,51 +18,60 @@ class Encoder(nn.Module):
     :param dropout: percentage of nodes to dropout
     :param block: LSTM/GRU block
     """
-    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, conditional, block = 'LSTM'):
+    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, conditional, condition, block = 'LSTM'):
 
         super(Encoder, self).__init__()
+        # if conditional:
+        #     self.number_of_features = number_of_features + condition.shape[1]
+        # else:
         self.number_of_features = number_of_features
+
         self.hidden_size = hidden_size
         self.hidden_layer_depth = hidden_layer_depth
         self.latent_length = latent_length
         self.conditional = conditional
 
+        # if block == 'LSTM':
+        #     self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
+        # elif block == 'GRU':
+        #     self.model = nn.GRU(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
         if block == 'LSTM':
-            self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
+            self.model = nn.LSTM(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
         elif block == 'GRU':
-            self.model = nn.GRU(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
+            self.model = nn.GRU(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
         else:
             raise NotImplementedError
+        if conditional:
+            self.hidden_to_latent = nn.Linear(self.number_of_features + condition.shape[1], self.hidden_size)
 
     def forward(self, x, c=None):
         """Forward propagation of encoder. Given input, outputs the last hidden state of encoder
-
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
-        # if self.conditional:
+         # if self.conditional:
         #     x = torch.cat((x, c), dim=-1)
         
         _, (h_end, c_end) = self.model(x)
-
-        h_end = h_end[-1, :, :]
-        return h_end
+        output = h_end[-1, :, :]
+        if self.conditional:
+            output = torch.cat((output, c), dim=-1)
+            output = self.hidden_to_latent(output)
+        return output
 
 
 class Lambda(nn.Module):
     """Lambda module converts output of encoder to latent vector
-
     :param hidden_size: hidden size of the encoder
     :param latent_length: latent vector length
     """
     def __init__(self, hidden_size, latent_length, conditional, condition):
         super(Lambda, self).__init__()
         self.hidden_size = hidden_size
-
-        if conditional:
-            self.latent_length = latent_length + condition.shape[1]
-        else:
-            self.latent_length = latent_length
+        # if conditional:
+        #     self.latent_length = latent_length + condition.shape[1]
+        # else:
+        self.latent_length = latent_length
 
         self.hidden_to_mean = nn.Linear(self.hidden_size, self.latent_length)
         self.hidden_to_logvar = nn.Linear(self.hidden_size, self.latent_length)
@@ -73,7 +81,6 @@ class Lambda(nn.Module):
 
     def forward(self, cell_output):
         """Given last hidden state of encoder, passes through a linear layer, and finds the mean and variance
-
         :param cell_output: last hidden state of encoder
         :return: latent vector
         """
@@ -90,7 +97,6 @@ class Lambda(nn.Module):
 
 class Decoder(nn.Module):
     """Converts latent vector into output
-
     :param sequence_length: length of the input sequence
     :param batch_size: batch size of the input sequence
     :param hidden_size: hidden size of the RNN
@@ -134,15 +140,11 @@ class Decoder(nn.Module):
 
     def forward(self, latent, c=None):
         """Converts latent to hidden to output
-
         :param latent: latent vector
         :return: outputs consisting of mean and std dev of vector
         """
-        # if self.conditional:
-        #     print(c.shape)
-        #     print(latent.shape)
-        #     latent = torch.cat((latent, c), dim=-1)
-        #     print(latent.shape)
+        if self.conditional:
+            latent = torch.cat((latent, c), dim=-1)
         h_state = self.latent_to_hidden(latent)
 
         if isinstance(self.model, nn.LSTM):
@@ -164,7 +166,6 @@ def _assert_no_grad(tensor):
 
 class VRAE(BaseEstimator, nn.Module):
     """Variational recurrent auto-encoder. This module is used for dimensionality reduction of timeseries
-
     :param sequence_length: length of the input sequence
     :param number_of_features: number of input features
     :param hidden_size:  hidden size of the RNN
@@ -209,6 +210,7 @@ class VRAE(BaseEstimator, nn.Module):
                                latent_length=latent_length,
                                dropout=dropout_rate,
                                block=block,
+                               condition=condition,
                                conditional=conditional)
 
         self.lmbd = Lambda(hidden_size=hidden_size,
@@ -264,14 +266,14 @@ class VRAE(BaseEstimator, nn.Module):
                 batch_size=self.batch_size,
                 cuda=self.use_cuda)
 
-    def forward(self, x, conditional, condition):
+    def forward(self, x, conditional, condition=None):
         """
         Forward propagation which involves one pass from inputs to encoder to lambda to decoder
-
         :param x:input tensor
         :return: the decoded output, latent vector
         """
-        cell_output = self.encoder(x, None)
+        # cell_output = self.encoder(x, None)
+        cell_output = self.encoder(x, condition)
         latent = self.lmbd(cell_output)
         x_decoded = self.decoder(latent, condition)
 
@@ -280,7 +282,6 @@ class VRAE(BaseEstimator, nn.Module):
     def _rec(self, x_decoded, x, loss_fn):
         """
         Compute the loss given output x decoded, input x and the specified loss function
-
         :param x_decoded: output of the decoder
         :param x: input to the encoder
         :param loss_fn: loss function specified
@@ -297,7 +298,6 @@ class VRAE(BaseEstimator, nn.Module):
         """
         Given input tensor, forward propagate, compute the loss, and backward propagate.
         Represents the lifecycle of a single iteration
-
         :param X: Input tensor
         :return: total loss, reconstruction loss, kl-divergence loss and original input
         """
@@ -313,7 +313,6 @@ class VRAE(BaseEstimator, nn.Module):
     def _train(self, train_input_loader, train_target_loader):
         """
         For each epoch, given the batch_size, run this function batch_size * num_of_batches number of times
-
         :param train_loader:input train loader with shuffle
         :return:
         """
@@ -366,7 +365,6 @@ class VRAE(BaseEstimator, nn.Module):
     def fit(self, dataset_train_input, dataset_train_target):
         """
         Calls `_train` function over a fixed number of epochs, specified by `n_epochs`
-
         :param dataset: `Dataset` object
         :param bool save: If true, dumps the trained model parameters as pickle file at `dload` directory
         :return:
@@ -393,7 +391,6 @@ class VRAE(BaseEstimator, nn.Module):
     def _batch_transform(self, x):
         """
         Passes the given input tensor into encoder and lambda function
-
         :param x: input batch tensor
         :return: intermediate latent vector
         """
@@ -406,7 +403,6 @@ class VRAE(BaseEstimator, nn.Module):
     def _batch_reconstruct(self, x, condition):
         """
         Passes the given input tensor into encoder, lambda and decoder function
-
         :param x: input batch tensor
         :return: reconstructed output tensor
         """
@@ -420,7 +416,6 @@ class VRAE(BaseEstimator, nn.Module):
         """
         Given input dataset, creates dataloader, runs dataloader on `_batch_reconstruct`
         Prerequisite is that model has to be fit
-
         :param dataset: input dataset who's output vectors are to be obtained
         :param bool save: If true, dumps the output vector dataframe as a pickle file
         :return:
@@ -461,7 +456,6 @@ class VRAE(BaseEstimator, nn.Module):
         """
         Given input dataset, creates dataloader, runs dataloader on `_batch_transform`
         Prerequisite is that model has to be fit
-
         :param dataset: input dataset who's latent vectors are to be obtained
         :param bool save: If true, dumps the latent vector dataframe as a pickle file
         :return:
@@ -497,7 +491,6 @@ class VRAE(BaseEstimator, nn.Module):
     def fit_transform(self, dataset, save = True):
         """
         Combines the `fit` and `transform` functions above
-
         :param dataset: Dataset on which fit and transform have to be performed
         :param bool save: If true, dumps the model and latent vectors as pickle file
         :return: latent vectors for input dataset
@@ -508,7 +501,6 @@ class VRAE(BaseEstimator, nn.Module):
     def save(self, file_name):
         """
         Pickles the model parameters to be retrieved later
-
         :param file_name: the filename to be saved as,`dload` serves as the download directory
         :return: None
         """
@@ -522,7 +514,6 @@ class VRAE(BaseEstimator, nn.Module):
     def load(self, PATH):
         """
         Loads the model's parameters from the path mentioned
-
         :param PATH: Should contain pickle file
         :return: None
         """

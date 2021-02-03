@@ -33,11 +33,15 @@ if __name__ == '__main__':
 
     if args.mode == 'cvae_lstm_train':
         model = ConfigCvaeLstm(is_training=True,**config)
-        model.train()
+        model.TakeData()
+        model.Split()
+        model.Train()
     elif args.mode == 'cvae_lstm_test':
         # predict
         model = ConfigCvaeLstm(is_training=False,**config)
-        model.test()
+        model.TakeData()
+        model.Split()
+        model.Test()
     elif args.mode == 'dgi_train':
         model = ConfigDGI(is_training=True,**config)
         model.train()

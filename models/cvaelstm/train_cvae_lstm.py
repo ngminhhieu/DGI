@@ -17,35 +17,9 @@ def PrepareData(pm_dataset):
       pm_data = pm_data.astype(np.float)
       return pm_data
 
-
-
 class ConfigCvaeLstm:
+      
       def __init__(self,is_training=True, **kwargs):
-            # take the dataset 
-            dataset = pd.read_csv('./data/cvae_lstm/pm.csv')
-            self.pm_data = PrepareData(dataset)
-
-            # Perform the train validation split
-            train_data, val_data, test_data = train_val_test_split(self.pm_data, valid_size=0.2, test_size=0.2)
-
-
-            # Standardize the data to bring the inputs on a uniform scale
-            normalized_train, sc = standardizeData(train_data, train = True)
-            normalized_val, _ = standardizeData(val_data, sc)
-            normalized_test, _ = standardizeData(test_data, sc)
-
-            self.sequence_length = 14
-            trainX, trainY = getData(normalized_train, self.sequence_length)
-            valX, valY = getData(normalized_val, self.sequence_length)
-            testX, testY = getData(normalized_test, self.sequence_length)
-            self.trainX = TensorDataset(torch.from_numpy(trainX))
-            self.trainY = TensorDataset(torch.from_numpy(trainY))
-            self.valX = TensorDataset(torch.from_numpy(valX))
-            self.valY = valY
-            self.testX = TensorDataset(torch.from_numpy(testX))
-            self.testY = TensorDataset(torch.from_numpy(testY))
-            self.number_of_features = trainX.shape[2]
-
             self._kwargs = kwargs
             self._model_kwargs = kwargs.get('model')
             self._data_kwargs = kwargs.get('data')
@@ -68,21 +42,45 @@ class ConfigCvaeLstm:
             self.block = self._model_kwargs.get('block') # options: LSTM, GRU
             self.conditional = self._model_kwargs.get('conditional')
     
+      def TakeData(self):
+            # take the dataset pm 2.5
+            dataset = pd.read_csv('./data/cvae_lstm/pm.csv')
+            self.pm_data = PrepareData(dataset)
+            # take data location 
             location = pd.read_csv('./data/cvae_lstm/locations.csv')
             location_lat = location.iloc[:, 1].to_numpy()
             location_lat_train = np.expand_dims(np.array(location_lat[1:7]), axis=0)
             location_lat_train = np.repeat(location_lat_train, self.batch_size, axis=0)
             location_lat_test = np.reshape(np.array(location_lat[7]), (1,1))
             location_lat_test = np.repeat(location_lat_test, self.batch_size, axis=0)
-            self.location_lat_train = torch.from_numpy(location_lat_train)
-            self.location_lat_test = torch.from_numpy(location_lat_test)
+            self.location_lat_train = torch.Tensor(location_lat_train)
+            self.location_lat_test = torch.Tensor(location_lat_test)
             if self.cuda:
               self.location_lat_train=self.location_lat_train.cuda()
               self.location_lat_test=self.location_lat_test.cuda()
 
-      def train(self):
-            
-            vrae = VRAE(sequence_length=self.sequence_length,
+      def Split(self):
+            # Perform the train validation split
+            train_data, val_data, test_data = train_val_test_split(self.pm_data, valid_size=0.2, test_size=0.2)
+
+            # Standardize the data to bring the inputs on a uniform scale
+            normalized_train, sc = standardizeData(train_data, train = True)
+            normalized_val, _ = standardizeData(val_data, sc)
+            normalized_test, _ = standardizeData(test_data, sc)
+
+            self.sequence_length = 14
+            trainX, trainY = getData(normalized_train, self.sequence_length)
+            valX, valY = getData(normalized_val, self.sequence_length)
+            testX, testY = getData(normalized_test, self.sequence_length)
+            self.trainX = TensorDataset(torch.from_numpy(trainX))
+            self.trainY = TensorDataset(torch.from_numpy(trainY))
+            self.valX = TensorDataset(torch.from_numpy(valX))
+            self.valY = valY
+            self.testX = TensorDataset(torch.from_numpy(testX))
+            self.testY = TensorDataset(torch.from_numpy(testY))
+            self.number_of_features = trainX.shape[2]
+
+            self.vrae = VRAE(sequence_length=self.sequence_length,
                         condition = self.location_lat_train,
                         number_of_features = self.number_of_features,
                         patience = self.patience,
@@ -102,10 +100,13 @@ class ConfigCvaeLstm:
                         block = self.block,
                         dload = self.dload,
                         conditional = self.conditional)
-            
-            vrae.fit(self.trainX, self.trainY)
-            vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
-            z_run = vrae.reconstruct(self.valX, condition=self.location_lat_test)
+
+      def Train(self):           
+            self.vrae.fit(self.trainX, self.trainY)
+
+      def Test(self):
+            self.vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
+            z_run = self.vrae.reconstruct(self.valX, condition=self.location_lat_test)
             z_run = np.swapaxes(z_run,0,1)
             valY = self.valY[:z_run.shape[0]]
             z_run = z_run.reshape(-1, z_run.shape[-1])
