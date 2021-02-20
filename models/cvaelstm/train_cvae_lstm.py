@@ -70,9 +70,9 @@ class ConfigCvaeLstm:
     
             location = pd.read_csv('./data/cvae_lstm/locations.csv')
             location_lat = location.iloc[:, 1].to_numpy()
-            location_lat_train = np.expand_dims(np.array(location_lat[1:7]), axis=0)
+            location_lat_train = np.expand_dims(np.array(location_lat[0:self.number_of_features]), axis=0)
             location_lat_train = np.repeat(location_lat_train, self.batch_size, axis=0)
-            location_lat_test = np.reshape(np.array(location_lat[7]), (1,1))
+            location_lat_test = np.reshape(np.array(location_lat[-1]), (1,1))
             location_lat_test = np.repeat(location_lat_test, self.batch_size, axis=0)
             self.location_lat_train = torch.from_numpy(location_lat_train)
             self.location_lat_test = torch.from_numpy(location_lat_test)

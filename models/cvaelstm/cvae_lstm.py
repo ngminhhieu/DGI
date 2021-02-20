@@ -19,10 +19,14 @@ class Encoder(nn.Module):
     :param dropout: percentage of nodes to dropout
     :param block: LSTM/GRU block
     """
-    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, conditional, block = 'LSTM'):
+    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, conditional, condition, block = 'LSTM'):
 
         super(Encoder, self).__init__()
-        self.number_of_features = number_of_features
+        if conditional:
+            self.number_of_features = number_of_features + condition.shape[1]
+        else:
+            self.number_of_features = number_of_features
+
         self.hidden_size = hidden_size
         self.hidden_layer_depth = hidden_layer_depth
         self.latent_length = latent_length
@@ -41,8 +45,8 @@ class Encoder(nn.Module):
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
-        # if self.conditional:
-        #     x = torch.cat((x, c), dim=-1)
+        if self.conditional:
+            x = torch.cat((x, c), dim=-1)
         
         _, (h_end, c_end) = self.model(x)
 
@@ -60,10 +64,10 @@ class Lambda(nn.Module):
         super(Lambda, self).__init__()
         self.hidden_size = hidden_size
 
-        if conditional:
-            self.latent_length = latent_length + condition.shape[1]
-        else:
-            self.latent_length = latent_length
+        # if conditional:
+        #     self.latent_length = latent_length + condition.shape[1]
+        # else:
+        #     self.latent_length = latent_length
 
         self.hidden_to_mean = nn.Linear(self.hidden_size, self.latent_length)
         self.hidden_to_logvar = nn.Linear(self.hidden_size, self.latent_length)
@@ -138,11 +142,8 @@ class Decoder(nn.Module):
         :param latent: latent vector
         :return: outputs consisting of mean and std dev of vector
         """
-        # if self.conditional:
-        #     print(c.shape)
-        #     print(latent.shape)
-        #     latent = torch.cat((latent, c), dim=-1)
-        #     print(latent.shape)
+        if self.conditional:
+            latent = torch.cat((latent, c), dim=-1)
         h_state = self.latent_to_hidden(latent)
 
         if isinstance(self.model, nn.LSTM):
@@ -264,14 +265,15 @@ class VRAE(BaseEstimator, nn.Module):
                 batch_size=self.batch_size,
                 cuda=self.use_cuda)
 
-    def forward(self, x, conditional, condition):
+    def forward(self, x, conditional, condition=None):
         """
         Forward propagation which involves one pass from inputs to encoder to lambda to decoder
 
         :param x:input tensor
         :return: the decoded output, latent vector
         """
-        cell_output = self.encoder(x, None)
+        # cell_output = self.encoder(x, None)
+        cell_output = self.encoder(x, condition)
         latent = self.lmbd(cell_output)
         x_decoded = self.decoder(latent, condition)
 
