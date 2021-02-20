@@ -43,8 +43,7 @@ class Encoder(nn.Module):
         else:
             raise NotImplementedError
         if conditional:
-            self.number_of_features = number_of_features + condition.shape[1]
-        self.hidden_to_latent = nn.Linear(self.number_of_features, self.hidden_size)
+            self.hidden_to_latent = nn.Linear(self.number_of_features + condition.shape[1], self.hidden_size)
 
     def forward(self, x, c=None):
         """Forward propagation of encoder. Given input, outputs the last hidden state of encoder
@@ -60,7 +59,7 @@ class Encoder(nn.Module):
 
         if self.conditional:
             x = torch.cat((x, c), dim=-1)
-            _, (h_end, c_end) = self.model(x)
+            _, (h_end, c_end) = self.hidden_to_latent(x)
 
         h_end = h_end[-1, :, :]
         return h_end
