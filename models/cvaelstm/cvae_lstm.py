@@ -51,18 +51,15 @@ class Encoder(nn.Module):
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
-        # if self.conditional:
+         # if self.conditional:
         #     x = torch.cat((x, c), dim=-1)
         
-        # _, (h_end, c_end) = self.model(x)
-        x, _, _ = self.model(x)
-
+        _, (h_end, c_end) = self.model(x)
+        output = h_end[-1, :, :]
         if self.conditional:
-            x = torch.cat((x, c), dim=-1)
-            _, (h_end, c_end) = self.hidden_to_latent(x)
-
-        h_end = h_end[-1, :, :]
-        return h_end
+            output = torch.cat((output, c), dim=-1)
+            output = self.hidden_to_latent(output)
+        return output
 
 
 class Lambda(nn.Module):

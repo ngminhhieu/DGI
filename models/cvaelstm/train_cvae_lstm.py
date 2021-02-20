@@ -74,8 +74,8 @@ class ConfigCvaeLstm:
             location_lat_train = np.repeat(location_lat_train, self.batch_size, axis=0)
             location_lat_test = np.reshape(np.array(location_lat[-1]), (1,1))
             location_lat_test = np.repeat(location_lat_test, self.batch_size, axis=0)
-            self.location_lat_train = torch.from_numpy(location_lat_train)
-            self.location_lat_test = torch.from_numpy(location_lat_test)
+            self.location_lat_train = torch.Tensor(location_lat_train)
+            self.location_lat_test = torch.Tensor(location_lat_test)
             if self.cuda:
               self.location_lat_train=self.location_lat_train.cuda()
               self.location_lat_test=self.location_lat_test.cuda()
