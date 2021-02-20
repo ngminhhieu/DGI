@@ -22,22 +22,29 @@ class Encoder(nn.Module):
     def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, conditional, condition, block = 'LSTM'):
 
         super(Encoder, self).__init__()
-        if conditional:
-            self.number_of_features = number_of_features + condition.shape[1]
-        else:
-            self.number_of_features = number_of_features
+        # if conditional:
+        #     self.number_of_features = number_of_features + condition.shape[1]
+        # else:
+        self.number_of_features = number_of_features
 
         self.hidden_size = hidden_size
         self.hidden_layer_depth = hidden_layer_depth
         self.latent_length = latent_length
         self.conditional = conditional
 
+        # if block == 'LSTM':
+        #     self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
+        # elif block == 'GRU':
+        #     self.model = nn.GRU(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
         if block == 'LSTM':
-            self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
+            self.model = nn.LSTM(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
         elif block == 'GRU':
-            self.model = nn.GRU(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
+            self.model = nn.GRU(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
         else:
             raise NotImplementedError
+        if conditional:
+            self.number_of_features = number_of_features + condition.shape[1]
+        self.hidden_to_latent = nn.Linear(self.number_of_features, self.hidden_size)
 
     def forward(self, x, c=None):
         """Forward propagation of encoder. Given input, outputs the last hidden state of encoder
@@ -45,10 +52,15 @@ class Encoder(nn.Module):
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
+        # if self.conditional:
+        #     x = torch.cat((x, c), dim=-1)
+        
+        # _, (h_end, c_end) = self.model(x)
+        x, _, _ = self.model(x)
+
         if self.conditional:
             x = torch.cat((x, c), dim=-1)
-        
-        _, (h_end, c_end) = self.model(x)
+            _, (h_end, c_end) = self.model(x)
 
         h_end = h_end[-1, :, :]
         return h_end
@@ -63,11 +75,10 @@ class Lambda(nn.Module):
     def __init__(self, hidden_size, latent_length, conditional, condition):
         super(Lambda, self).__init__()
         self.hidden_size = hidden_size
-
         # if conditional:
         #     self.latent_length = latent_length + condition.shape[1]
         # else:
-        #     self.latent_length = latent_length
+        self.latent_length = latent_length
 
         self.hidden_to_mean = nn.Linear(self.hidden_size, self.latent_length)
         self.hidden_to_logvar = nn.Linear(self.hidden_size, self.latent_length)
@@ -210,6 +221,7 @@ class VRAE(BaseEstimator, nn.Module):
                                latent_length=latent_length,
                                dropout=dropout_rate,
                                block=block,
+                               condition=condition,
                                conditional=conditional)
 
         self.lmbd = Lambda(hidden_size=hidden_size,
