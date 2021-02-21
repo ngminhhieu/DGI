@@ -46,7 +46,6 @@ class ConfigCvaeLstm:
             self.testY = TensorDataset(torch.from_numpy(testY))
             self.number_of_features = trainX.shape[2]
             self.sequence_length = trainX.shape[1]
-            print("Welcome")
 
             self._kwargs = kwargs
             self._model_kwargs = kwargs.get('model')
