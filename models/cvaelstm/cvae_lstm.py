@@ -96,7 +96,7 @@ class Decoder(nn.Module):
     :param block: GRU/LSTM - use the same which you've used in the encoder
     :param dtype: Depending on cuda enabled/disabled, create the tensor
     """
-    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, condition, block='LSTM'):
+    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, number_of_features, output_size, dtype, condition, block='LSTM'):
 
         super(Decoder, self).__init__()
 
@@ -105,20 +105,27 @@ class Decoder(nn.Module):
         self.sequence_length = sequence_length
         self.hidden_layer_depth = hidden_layer_depth
         self.output_size = output_size
+        self.number_of_features = number_of_features
         self.dtype = dtype
         self.latent_length = latent_length + condition.shape[1]
 
+        # if block == 'LSTM':
+        #     self.model = nn.LSTM(1, self.hidden_size, self.hidden_layer_depth)
+        # elif block == 'GRU':
+        #     self.model = nn.GRU(1, self.hidden_size, self.hidden_layer_depth)
         if block == 'LSTM':
-            self.model = nn.LSTM(1, self.hidden_size, self.hidden_layer_depth)
+            self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth)
         elif block == 'GRU':
-            self.model = nn.GRU(1, self.hidden_size, self.hidden_layer_depth)
+            self.model = nn.GRU(self.number_of_features, self.hidden_size, self.hidden_layer_depth)
         else:
             raise NotImplementedError
 
         self.latent_to_hidden = nn.Linear(self.latent_length, self.hidden_size)
-        self.hidden_to_output = nn.Linear(self.hidden_size, self.output_size)
+        # self.hidden_to_output = nn.Linear(self.hidden_size, self.output_size)
+        self.hidden_to_output = nn.Linear(self.hidden_size, self.number_of_features)
 
-        self.decoder_inputs = torch.zeros(self.sequence_length, self.batch_size, 1, requires_grad=True).type(self.dtype)
+        # self.decoder_inputs = torch.zeros(self.sequence_length, self.batch_size, 1, requires_grad=True).type(self.dtype)
+        self.decoder_inputs = torch.zeros(1, self.batch_size, self.number_of_features, requires_grad=True).type(self.dtype)
         self.c_0 = torch.zeros(self.hidden_layer_depth, self.batch_size, self.hidden_size, requires_grad=True).type(self.dtype)
 
         nn.init.xavier_uniform_(self.latent_to_hidden.weight)
@@ -208,6 +215,7 @@ class VRAE(BaseEstimator, nn.Module):
                                hidden_layer_depth=hidden_layer_depth,
                                latent_length=latent_length,
                             #    output_size=number_of_features,
+                               number_of_features=number_of_features,
                                output_size=output_dim,
                                block=block,
                                condition=condition,

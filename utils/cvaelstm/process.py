@@ -15,7 +15,8 @@ def getData(dataset, sequence_length, output_dim=1):
     for i in range(T):
         ips[i, :, :] = dataset[i:i+sequence_length, 0:(dataset.shape[1]-output_dim)]
         ops[i, :, :] = dataset[i:i+sequence_length, -output_dim:]
-
+    ips = np.transpose(ips, (0, 2, 1))
+    ops = np.transpose(ops, (0, 2, 1))
     return ips, ops
 
 

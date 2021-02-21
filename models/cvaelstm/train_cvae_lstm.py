@@ -104,7 +104,7 @@ class ConfigCvaeLstm:
             
             vrae.fit(self.trainX, self.trainY)
             vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
-            z_run = vrae.reconstruct(self.valX, condition=self.location_lat_test)
+            z_run = vrae.reconstruct(self.valX, condition=self.location_lat_train)
             z_run = np.swapaxes(z_run,0,1)
             valY = self.valY[:z_run.shape[0]]
             z_run = z_run.reshape(-1, z_run.shape[-1])
