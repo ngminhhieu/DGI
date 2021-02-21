@@ -19,31 +19,22 @@ class Encoder(nn.Module):
     :param dropout: percentage of nodes to dropout
     :param block: LSTM/GRU block
     """
-    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, conditional, condition, block = 'LSTM'):
+    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, condition, block = 'LSTM'):
 
         super(Encoder, self).__init__()
-        # if conditional:
-        #     self.number_of_features = number_of_features + condition.shape[1]
-        # else:
         self.number_of_features = number_of_features
 
         self.hidden_size = hidden_size
         self.hidden_layer_depth = hidden_layer_depth
         self.latent_length = latent_length
-        self.conditional = conditional
 
-        # if block == 'LSTM':
-        #     self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
-        # elif block == 'GRU':
-        #     self.model = nn.GRU(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
         if block == 'LSTM':
             self.model = nn.LSTM(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
         elif block == 'GRU':
             self.model = nn.GRU(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
         else:
             raise NotImplementedError
-        if conditional:
-            self.hidden_to_latent = nn.Linear(self.number_of_features + condition.shape[1], self.hidden_size)
+        self.hidden_to_latent = nn.Linear(self.number_of_features + condition.shape[1], self.hidden_size)
 
     def forward(self, x, c=None):
         """Forward propagation of encoder. Given input, outputs the last hidden state of encoder
@@ -51,14 +42,11 @@ class Encoder(nn.Module):
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
-         # if self.conditional:
-        #     x = torch.cat((x, c), dim=-1)
         
         _, (h_end, c_end) = self.model(x)
         output = h_end[-1, :, :]
-        if self.conditional:
-            output = torch.cat((output, c), dim=-1)
-            output = self.hidden_to_latent(output)
+        output = torch.cat((output, c), dim=-1)
+        output = self.hidden_to_latent(output)
         return output
 
 
@@ -68,12 +56,9 @@ class Lambda(nn.Module):
     :param hidden_size: hidden size of the encoder
     :param latent_length: latent vector length
     """
-    def __init__(self, hidden_size, latent_length, conditional, condition):
+    def __init__(self, hidden_size, latent_length, condition):
         super(Lambda, self).__init__()
         self.hidden_size = hidden_size
-        # if conditional:
-        #     self.latent_length = latent_length + condition.shape[1]
-        # else:
         self.latent_length = latent_length
 
         self.hidden_to_mean = nn.Linear(self.hidden_size, self.latent_length)
@@ -111,7 +96,7 @@ class Decoder(nn.Module):
     :param block: GRU/LSTM - use the same which you've used in the encoder
     :param dtype: Depending on cuda enabled/disabled, create the tensor
     """
-    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, conditional, condition, block='LSTM'):
+    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, output_size, dtype, condition, block='LSTM'):
 
         super(Decoder, self).__init__()
 
@@ -121,11 +106,7 @@ class Decoder(nn.Module):
         self.hidden_layer_depth = hidden_layer_depth
         self.output_size = output_size
         self.dtype = dtype
-        self.conditional = conditional
-        if self.conditional:
-            self.latent_length = latent_length + condition.shape[1]
-        else:
-            self.latent_length = latent_length
+        self.latent_length = latent_length + condition.shape[1]
 
         if block == 'LSTM':
             self.model = nn.LSTM(1, self.hidden_size, self.hidden_layer_depth)
@@ -149,8 +130,7 @@ class Decoder(nn.Module):
         :param latent: latent vector
         :return: outputs consisting of mean and std dev of vector
         """
-        if self.conditional:
-            latent = torch.cat((latent, c), dim=-1)
+        latent = torch.cat((latent, c), dim=-1)
         h_state = self.latent_to_hidden(latent)
 
         if isinstance(self.model, nn.LSTM):
@@ -194,11 +174,10 @@ class VRAE(BaseEstimator, nn.Module):
     def __init__(self, sequence_length, condition, number_of_features, patience=15, output_dim=1, hidden_size=90, hidden_layer_depth=2, latent_length=20,
                  batch_size=32, learning_rate=0.005, block='LSTM',
                  n_epochs=5, dropout_rate=0., optimizer='Adam', loss='MSELoss',
-                 cuda=False, print_every=100, clip=True, max_grad_norm=5, dload='.', conditional=False):
+                 cuda=False, print_every=100, clip=True, max_grad_norm=5, dload='.'):
 
         super(VRAE, self).__init__()
 
-        self.conditional = conditional
         self.condition = condition
         self.dtype = torch.FloatTensor
         self.use_cuda = cuda
@@ -217,12 +196,10 @@ class VRAE(BaseEstimator, nn.Module):
                                latent_length=latent_length,
                                dropout=dropout_rate,
                                block=block,
-                               condition=condition,
-                               conditional=conditional)
+                               condition=condition)
 
         self.lmbd = Lambda(hidden_size=hidden_size,
                            latent_length=latent_length,
-                           conditional = conditional,
                            condition = condition)
 
         self.decoder = Decoder(sequence_length=sequence_length,
@@ -233,7 +210,6 @@ class VRAE(BaseEstimator, nn.Module):
                             #    output_size=number_of_features,
                                output_size=output_dim,
                                block=block,
-                               conditional=conditional,
                                condition=condition,
                                dtype=self.dtype)
 
@@ -273,7 +249,7 @@ class VRAE(BaseEstimator, nn.Module):
                 batch_size=self.batch_size,
                 cuda=self.use_cuda)
 
-    def forward(self, x, conditional, condition=None):
+    def forward(self, x, condition=None):
         """
         Forward propagation which involves one pass from inputs to encoder to lambda to decoder
 
@@ -314,7 +290,7 @@ class VRAE(BaseEstimator, nn.Module):
         x = Variable(X[:,:,:].type(self.dtype), requires_grad = True)
         y = Variable(Y[:,:,:].type(self.dtype), requires_grad = True)
 
-        x_decoded, _ = self(x, self.conditional, self.condition)
+        x_decoded, _ = self(x, self.condition)
         loss, recon_loss, kl_loss = self._rec(x_decoded, y.detach(), self.loss_fn)
 
         return loss, recon_loss, kl_loss, y
@@ -422,7 +398,7 @@ class VRAE(BaseEstimator, nn.Module):
         """
 
         x = Variable(x.type(self.dtype), requires_grad = False)
-        x_decoded, _ = self(x, self.conditional, condition)
+        x_decoded, _ = self(x, condition)
 
         return x_decoded.cpu().data.numpy()
 

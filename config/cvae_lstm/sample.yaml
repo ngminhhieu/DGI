@@ -19,7 +19,6 @@ model:
   max_grad_norm: 5
   loss: 'MSELoss' 
   block: 'LSTM' 
-  conditional: True
 train:
   dropout_rate: 0
   n_epochs: 500

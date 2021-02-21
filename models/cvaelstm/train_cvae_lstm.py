@@ -45,6 +45,7 @@ class ConfigCvaeLstm:
             self.testX = TensorDataset(torch.from_numpy(testX))
             self.testY = TensorDataset(torch.from_numpy(testY))
             self.number_of_features = trainX.shape[2]
+            self.sequence_length = trainX.shape[1]
 
             self._kwargs = kwargs
             self._model_kwargs = kwargs.get('model')
@@ -66,7 +67,6 @@ class ConfigCvaeLstm:
             self.patience = self._train_kwargs.get('patience')
             self.loss = self._model_kwargs.get('loss') # options: SmoothL1Loss, MSELoss
             self.block = self._model_kwargs.get('block') # options: LSTM, GRU
-            self.conditional = self._model_kwargs.get('conditional')
     
             location = pd.read_csv('./data/cvae_lstm/locations.csv')
             location_lat = location.iloc[:, 1].to_numpy()
@@ -100,8 +100,7 @@ class ConfigCvaeLstm:
                         max_grad_norm= self.max_grad_norm,
                         loss = self.loss,
                         block = self.block,
-                        dload = self.dload,
-                        conditional = self.conditional)
+                        dload = self.dload)
             
             vrae.fit(self.trainX, self.trainY)
             vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
