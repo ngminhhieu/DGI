@@ -18,6 +18,7 @@ def PrepareData(pm_dataset):
       return pm_data
 
 
+
 class ConfigCvaeLstm:
       def __init__(self,is_training=True, **kwargs):
             # take the dataset 
