@@ -23,18 +23,21 @@ class Encoder(nn.Module):
 
         super(Encoder, self).__init__()
         self.number_of_features = number_of_features
-
         self.hidden_size = hidden_size
         self.hidden_layer_depth = hidden_layer_depth
         self.latent_length = latent_length
 
+        # if block == 'LSTM':
+        #     self.model = nn.LSTM(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
+        # elif block == 'GRU':
+        #     self.model = nn.GRU(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
         if block == 'LSTM':
-            self.model = nn.LSTM(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
+            self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
         elif block == 'GRU':
-            self.model = nn.GRU(self.number_of_features, self.number_of_features, self.hidden_layer_depth, dropout = dropout)
+            self.model = nn.GRU(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
         else:
             raise NotImplementedError
-        self.hidden_to_latent = nn.Linear(self.number_of_features + condition.shape[1], self.hidden_size)
+        # self.hidden_to_latent = nn.Linear(self.number_of_features + condition.shape[1], self.hidden_size)
 
     def forward(self, x, c=None):
         """Forward propagation of encoder. Given input, outputs the last hidden state of encoder
@@ -45,8 +48,8 @@ class Encoder(nn.Module):
         
         _, (h_end, c_end) = self.model(x)
         output = h_end[-1, :, :]
-        output = torch.cat((output, c), dim=-1)
-        output = self.hidden_to_latent(output)
+        # output = torch.cat((output, c), dim=-1)
+        # output = self.hidden_to_latent(output)
         return output
 
 
@@ -178,7 +181,6 @@ class VRAE(BaseEstimator, nn.Module):
                  cuda=False, print_every=100, clip=True, max_grad_norm=5, dload='.'):
 
         super(VRAE, self).__init__()
-        
         self.condition = condition
         self.dtype = torch.FloatTensor
         self.use_cuda = cuda
