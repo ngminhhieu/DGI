@@ -338,9 +338,12 @@ class VRAE(BaseEstimator, nn.Module):
                 patience = 0
                 self.save('best_cvae_lstm.pkl')
             else:
+                print(patience)
                 patience += 1
             
             if patience == self.patience:
+                print(patience)
+                print(self.patience)
                 print("Early Stopping!")
                 break
 
