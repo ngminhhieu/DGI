@@ -345,6 +345,8 @@ class VRAE(BaseEstimator, nn.Module):
                 patience += 1
             
             if patience == self.patience:
+                print(patience)
+                print(self.patience)
                 print("Early Stopping!")
                 break
 
