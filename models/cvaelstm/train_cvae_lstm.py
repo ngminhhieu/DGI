@@ -102,6 +102,29 @@ class ConfigCvaeLstm:
                         dload = self.dload)
             
             vrae.fit(self.trainX, self.trainY)
+            
+
+      def test(self):
+            vrae = VRAE(sequence_length=self.sequence_length,
+                        condition = self.location_lat_train,
+                        number_of_features = self.number_of_features,
+                        patience = self.patience,
+                        hidden_size = self.hidden_size, 
+                        hidden_layer_depth = self.hidden_layer_depth,
+                        latent_length = self.latent_length,
+                        batch_size = self.batch_size,
+                        learning_rate = self.learning_rate,
+                        n_epochs = self.n_epochs,
+                        dropout_rate = self.dropout_rate,
+                        optimizer = self.optimizer, 
+                        cuda = self.cuda,
+                        print_every= self.print_every, 
+                        clip= self.clip, 
+                        max_grad_norm= self.max_grad_norm,
+                        loss = self.loss,
+                        block = self.block,
+                        dload = self.dload)
+                        
             vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
             z_run = vrae.reconstruct(self.valX, condition=self.location_lat_train)
             z_run = np.swapaxes(z_run,0,1)
