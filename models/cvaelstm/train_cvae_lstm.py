@@ -30,16 +30,16 @@ class ConfigCvaeLstm:
         train_data, val_data, test_data = train_val_test_split(self.pm_data, valid_size=0.2, test_size=0.2)
 
         location = pd.read_csv('./data/cvae_lstm/locations.csv')
-        location = location.iloc[:, 1].to_numpy()
-        location_lat_train = np.expand_dims(np.array(location_lat[0:self.number_of_features]), axis=0)
-        location_lat_train = np.repeat(location_lat_train, self.batch_size, axis=0)
-        location_lat_test = np.reshape(np.array(location_lat[-1]), (1,1))
-        location_lat_test = np.repeat(location_lat_test, self.batch_size, axis=0)
-        self.location_lat_train = torch.Tensor(location_lat_train)
-        self.location_lat_test = torch.Tensor(location_lat_test)
+        location = location.iloc[:, 1:].to_numpy()
+        location_train = np.expand_dims(np.array(location[0:self.number_of_features]), axis=0)
+        location_train = np.repeat(location_train, self.batch_size, axis=0)
+        location_test = np.reshape(np.array(location[-1]), (1,1))
+        location_test = np.repeat(location_test, self.batch_size, axis=0)
+        self.location_train = torch.Tensor(location_train)
+        self.location_test = torch.Tensor(location_test)
         if self.cuda:
-            self.location_lat_train=self.location_lat_train.cuda()
-            self.location_lat_test=self.location_lat_test.cuda()
+            self.location_train=self.location_train.cuda()
+            self.location_test=self.location_test.cuda()
 
         # Standardize the data to bring the inputs on a uniform scale
         normalized_train, sc = standardizeData(train_data, train = True)
@@ -89,7 +89,7 @@ class ConfigCvaeLstm:
         
 
         self.vrae = vrae = VRAE(sequence_length=self.sequence_length,
-                    condition = self.location_lat_train,
+                    condition = self.location_train,
                     number_of_features = self.number_of_features,
                     patience = self.patience,
                     hidden_size = self.hidden_size,
@@ -112,7 +112,7 @@ class ConfigCvaeLstm:
 
     def test(self):
         self.vrae.load('./log/cvae_lstm/best_cvae_lstm.pkl')
-        z_run = self.vrae.reconstruct(self.valX, condition=self.location_lat_train)
+        z_run = self.vrae.reconstruct(self.valX, condition=self.location_train)
         z_run = np.swapaxes(z_run,0,1)
         valY = self.valY[:z_run.shape[0]]
         z_run = z_run.reshape(-1, z_run.shape[-1])
