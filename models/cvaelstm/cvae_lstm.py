@@ -26,7 +26,7 @@ class Encoder(nn.Module):
         self.hidden_size = hidden_size
         self.hidden_layer_depth = hidden_layer_depth
         self.latent_length = latent_length
-        self.c_0 = torch.zeros(self.hidden_layer_depth, batch_size, self.hidden_size, requires_grad=True).type(self.dtype)
+        self.c_0 = torch.zeros(self.hidden_layer_depth, batch_size, self.hidden_size, requires_grad=True).type(dtype)
         if block == 'LSTM':
             self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
         elif block == 'GRU':
@@ -40,7 +40,7 @@ class Encoder(nn.Module):
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
-        
+
         _, (h_end, c_end) = self.model(x, initial_state=(c, self.c_0))
         output = h_end[-1, :, :]
         return output
@@ -205,8 +205,8 @@ class VRAE(BaseEstimator, nn.Module):
                                hidden_layer_depth=hidden_layer_depth,
                                latent_length=latent_length,
                                dropout=dropout_rate,
-                               block=block,
-                               dtype=self.dtype)
+                               dtype=self.dtype,
+                               block=block)
 
         self.lmbd = Lambda(hidden_size=hidden_size,
                            latent_length=latent_length)
@@ -328,7 +328,7 @@ class VRAE(BaseEstimator, nn.Module):
                 self.save('best_cvae_lstm.pkl')
             else:
                 patience += 1
-            
+
             if patience == self.patience:
                 print("Early Stopping!")
                 break
@@ -355,7 +355,7 @@ class VRAE(BaseEstimator, nn.Module):
                                   batch_size = self.batch_size,
                                   shuffle = True,
                                   drop_last=True)
-        
+
         train_target_loader = DataLoader(dataset = dataset_train_target,
                                   batch_size = self.batch_size,
                                   shuffle = True,
