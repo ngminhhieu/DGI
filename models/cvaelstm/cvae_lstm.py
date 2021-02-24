@@ -198,7 +198,7 @@ class VRAE(BaseEstimator, nn.Module):
         if self.use_cuda:
             self.dtype = torch.cuda.FloatTensor
 
-        self.embedding_condition = nn.Linear(self.batch_size, self.hidden_size)
+        self.embedding_condition = nn.Linear(condition.shape[1], self.hidden_size)
 
         self.encoder = Encoder(number_of_features = number_of_features,
                                hidden_size=hidden_size,
