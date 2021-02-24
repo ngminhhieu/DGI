@@ -41,7 +41,7 @@ class Encoder(nn.Module):
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
 
-        _, (h_end, c_end) = self.model(x, initial_state=(c, self.c_0))
+        _, (h_end, c_end) = self.model(x, (c, self.c_0))
         output = h_end[-1, :, :]
         return output
 

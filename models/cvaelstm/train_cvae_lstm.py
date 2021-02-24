@@ -79,8 +79,8 @@ class ConfigCvaeLstm:
         location_train = np.repeat(location_train, self.batch_size, axis=0)
         location_test = np.reshape(np.array(location[-1]), (1,2))
         location_test = np.repeat(location_test, self.batch_size, axis=0)
-        location_train = np.reshape(location_train, shape=(self.batch_size, -1))
-        location_test = np.reshape(location_test, shape=(self.batch_size, -1))
+        location_train = np.reshape(location_train, (self.batch_size, -1))
+        location_test = np.reshape(location_test, (self.batch_size, -1))
         self.location_train = torch.Tensor(location_train)
         self.location_test = torch.Tensor(location_test)
         if self.cuda:
