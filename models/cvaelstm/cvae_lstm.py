@@ -19,7 +19,7 @@ class Encoder(nn.Module):
     :param dropout: percentage of nodes to dropout
     :param block: LSTM/GRU block
     """
-    def __init__(self, number_of_features, hidden_size, batch_size, hidden_layer_depth, latent_length, dropout, block = 'LSTM'):
+    def __init__(self, number_of_features, hidden_size, batch_size, hidden_layer_depth, latent_length, dropout, dtype, block = 'LSTM'):
 
         super(Encoder, self).__init__()
         self.number_of_features = number_of_features
@@ -205,7 +205,8 @@ class VRAE(BaseEstimator, nn.Module):
                                hidden_layer_depth=hidden_layer_depth,
                                latent_length=latent_length,
                                dropout=dropout_rate,
-                               block=block)
+                               block=block,
+                               dtype=self.dtype)
 
         self.lmbd = Lambda(hidden_size=hidden_size,
                            latent_length=latent_length)
