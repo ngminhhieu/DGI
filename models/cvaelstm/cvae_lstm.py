@@ -52,7 +52,7 @@ class Lambda(nn.Module):
     :param hidden_size: hidden size of the encoder
     :param latent_length: latent vector length
     """
-    def __init__(self, hidden_size, latent_length, condition):
+    def __init__(self, hidden_size, latent_length):
         super(Lambda, self).__init__()
         self.hidden_size = hidden_size
         self.latent_length = latent_length
@@ -92,7 +92,7 @@ class Decoder(nn.Module):
     :param block: GRU/LSTM - use the same which you've used in the encoder
     :param dtype: Depending on cuda enabled/disabled, create the tensor
     """
-    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, number_of_features, output_size, dtype, condition, block='LSTM'):
+    def __init__(self, sequence_length, batch_size, hidden_size, hidden_layer_depth, latent_length, number_of_features, output_size, dtype, block='LSTM'):
 
         super(Decoder, self).__init__()
 
