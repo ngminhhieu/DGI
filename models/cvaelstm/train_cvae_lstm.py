@@ -6,6 +6,8 @@ import plotly
 import sys
 from torch.utils.data import DataLoader, TensorDataset
 from utils.cvaelstm.process import train_val_test_split, getData, standardizeData
+from sklearn.preprocessing import MinMaxScaler
+
 import matplotlib.pyplot as plt
 
 # plotly.offline.init_notebook_mode()
@@ -27,6 +29,17 @@ class ConfigCvaeLstm:
         # Perform the train validation split
         train_data, val_data, test_data = train_val_test_split(self.pm_data, valid_size=0.2, test_size=0.2)
 
+        location = pd.read_csv('./data/cvae_lstm/locations.csv')
+        location = location.iloc[:, 1].to_numpy()
+        location_lat_train = np.expand_dims(np.array(location_lat[0:self.number_of_features]), axis=0)
+        location_lat_train = np.repeat(location_lat_train, self.batch_size, axis=0)
+        location_lat_test = np.reshape(np.array(location_lat[-1]), (1,1))
+        location_lat_test = np.repeat(location_lat_test, self.batch_size, axis=0)
+        self.location_lat_train = torch.Tensor(location_lat_train)
+        self.location_lat_test = torch.Tensor(location_lat_test)
+        if self.cuda:
+            self.location_lat_train=self.location_lat_train.cuda()
+            self.location_lat_test=self.location_lat_test.cuda()
 
         # Standardize the data to bring the inputs on a uniform scale
         normalized_train, sc = standardizeData(train_data, train = True)
@@ -37,6 +50,12 @@ class ConfigCvaeLstm:
         trainX, trainY = getData(normalized_train, self.sequence_length)
         valX, valY = getData(normalized_val, self.sequence_length)
         testX, testY = getData(normalized_test, self.sequence_length)
+        scaler = MinMaxScaler(copy=True, feature_range=(0, 1))
+        scaler.fit(trainX)
+        trainX = scaler.transform(trainX)
+        trainY = scaler.transform(trainY)
+        valX = scaler.transform(valX)
+        valY = scaler.transform(valY)
         self.trainX = TensorDataset(torch.from_numpy(trainX))
         self.trainY = TensorDataset(torch.from_numpy(trainY))
         self.valX = TensorDataset(torch.from_numpy(valX))
@@ -67,17 +86,7 @@ class ConfigCvaeLstm:
         self.loss = self._model_kwargs.get('loss') # options: SmoothL1Loss, MSELoss
         self.block = self._model_kwargs.get('block') # options: LSTM, GRU
 
-        location = pd.read_csv('./data/cvae_lstm/locations.csv')
-        location_lat = location.iloc[:, 1].to_numpy()
-        location_lat_train = np.expand_dims(np.array(location_lat[0:self.number_of_features]), axis=0)
-        location_lat_train = np.repeat(location_lat_train, self.batch_size, axis=0)
-        location_lat_test = np.reshape(np.array(location_lat[-1]), (1,1))
-        location_lat_test = np.repeat(location_lat_test, self.batch_size, axis=0)
-        self.location_lat_train = torch.Tensor(location_lat_train)
-        self.location_lat_test = torch.Tensor(location_lat_test)
-        if self.cuda:
-            self.location_lat_train=self.location_lat_train.cuda()
-            self.location_lat_test=self.location_lat_test.cuda()
+        
 
         self.vrae = vrae = VRAE(sequence_length=self.sequence_length,
                     condition = self.location_lat_train,
