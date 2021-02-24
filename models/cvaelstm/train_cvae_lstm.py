@@ -114,10 +114,8 @@ class ConfigCvaeLstm:
         z_run = self.vrae.reconstruct(self.valX, condition=self.location_train)
         z_run = np.swapaxes(z_run,0,1)
         valY = self.valY[:z_run.shape[0]]
-        z_run = z_run.reshape(-1, z_run.shape[-1])
-        valY = valY.reshape(-1, valY.shape[-1])
-        plt.plot(z_run[:, -1], color='blue', label='generation')
-        plt.plot(valY[:, -1], color='red', label='groundtruth')
+        plt.plot(z_run[:, 0, 0], color='blue', label='generation')
+        plt.plot(valY[:, 0, 0], color='red', label='groundtruth')
         plt.savefig(self.dload + '/cvae_lstm.png')
         plt.legend()
         plt.close()

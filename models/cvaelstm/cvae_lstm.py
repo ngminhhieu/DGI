@@ -127,7 +127,6 @@ class Decoder(nn.Module):
         :param latent: latent vector
         :return: outputs consisting of mean and std dev of vector
         """
-        latent = torch.cat((latent, c), dim=-1)
         h_state = self.latent_to_hidden(latent)
 
         if isinstance(self.model, nn.LSTM):
@@ -199,6 +198,7 @@ class VRAE(BaseEstimator, nn.Module):
             self.dtype = torch.cuda.FloatTensor
 
         self.embedding_condition = nn.Linear(condition.shape[1], self.hidden_size)
+        self.sigmoid = nn.Sigmoid()
 
         self.encoder = Encoder(number_of_features = number_of_features,
                                hidden_size=hidden_size,
@@ -251,9 +251,12 @@ class VRAE(BaseEstimator, nn.Module):
         :return: the decoded output, latent vector
         """
         embedding_condition = self.embedding_condition(condition)
-        cell_output = self.encoder(x, condition)
+        embedding_condition = self.sigmoid(embedding_condition)
+        if len(embedding_condition.shape) == 2:
+            embedding_condition = torch.reshape(embedding_condition, (1, embedding_condition.shape[0], embedding_condition.shape[1]))
+        cell_output = self.encoder(x, embedding_condition)
         latent = self.lmbd(cell_output)
-        x_decoded = self.decoder(latent, condition)
+        x_decoded = self.decoder(latent, embedding_condition)
 
         return x_decoded, latent
 
