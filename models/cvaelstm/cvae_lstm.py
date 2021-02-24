@@ -103,6 +103,7 @@ class Decoder(nn.Module):
         self.output_size = output_size
         self.number_of_features = number_of_features
         self.dtype = dtype
+        self.latent_length = latent_length
 
         if block == 'LSTM':
             self.model = nn.LSTM(self.output_size, self.hidden_size, self.hidden_layer_depth)
