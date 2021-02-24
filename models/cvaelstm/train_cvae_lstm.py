@@ -29,18 +29,6 @@ class ConfigCvaeLstm:
         # Perform the train validation split
         train_data, val_data, test_data = train_val_test_split(self.pm_data, valid_size=0.2, test_size=0.2)
 
-        location = pd.read_csv('./data/cvae_lstm/locations.csv')
-        location = location.iloc[:, 1:].to_numpy()
-        location_train = np.expand_dims(np.array(location[0:self.number_of_features]), axis=0)
-        location_train = np.repeat(location_train, self.batch_size, axis=0)
-        location_test = np.reshape(np.array(location[-1]), (1,1))
-        location_test = np.repeat(location_test, self.batch_size, axis=0)
-        self.location_train = torch.Tensor(location_train)
-        self.location_test = torch.Tensor(location_test)
-        if self.cuda:
-            self.location_train=self.location_train.cuda()
-            self.location_test=self.location_test.cuda()
-
         # Standardize the data to bring the inputs on a uniform scale
         normalized_train, sc = standardizeData(train_data, train = True)
         normalized_val, _ = standardizeData(val_data, sc)
@@ -86,7 +74,17 @@ class ConfigCvaeLstm:
         self.loss = self._model_kwargs.get('loss') # options: SmoothL1Loss, MSELoss
         self.block = self._model_kwargs.get('block') # options: LSTM, GRU
 
-        
+        location = pd.read_csv('./data/cvae_lstm/locations.csv')
+        location = location.iloc[:, 1:].to_numpy()
+        location_train = np.expand_dims(np.array(location[0:self.number_of_features]), axis=0)
+        location_train = np.repeat(location_train, self.batch_size, axis=0)
+        location_test = np.reshape(np.array(location[-1]), (1,1))
+        location_test = np.repeat(location_test, self.batch_size, axis=0)
+        self.location_train = torch.Tensor(location_train)
+        self.location_test = torch.Tensor(location_test)
+        if self.cuda:
+            self.location_train=self.location_train.cuda()
+            self.location_test=self.location_test.cuda()
 
         self.vrae = vrae = VRAE(sequence_length=self.sequence_length,
                     condition = self.location_train,
