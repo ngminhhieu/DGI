@@ -77,7 +77,7 @@ class ConfigCvaeLstm:
         location = location.iloc[:, 1:].to_numpy()
         location_train = np.expand_dims(np.array(location[0:self.number_of_features]), axis=0)
         location_train = np.repeat(location_train, self.batch_size, axis=0)
-        location_test = np.reshape(np.array(location[-1]), (1,1))
+        location_test = np.reshape(np.array(location[-1]), (1,2))
         location_test = np.repeat(location_test, self.batch_size, axis=0)
         self.location_train = torch.Tensor(location_train)
         self.location_test = torch.Tensor(location_test)
