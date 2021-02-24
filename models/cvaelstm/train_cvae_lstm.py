@@ -28,7 +28,11 @@ class ConfigCvaeLstm:
 
         # Perform the train validation split
         train_data, val_data, test_data = train_val_test_split(self.pm_data, valid_size=0.2, test_size=0.2)
-
+        scaler = MinMaxScaler(copy=True, feature_range=(0, 1))
+        scaler.fit(train_data)
+        train_data = scaler.transform(train_data)
+        val_data = scaler.transform(val_data)
+        test_data = scaler.transform(test_data)
         # Standardize the data to bring the inputs on a uniform scale
         normalized_train, sc = standardizeData(train_data, train = True)
         normalized_val, _ = standardizeData(val_data, sc)
@@ -38,12 +42,7 @@ class ConfigCvaeLstm:
         trainX, trainY = getData(normalized_train, self.sequence_length)
         valX, valY = getData(normalized_val, self.sequence_length)
         testX, testY = getData(normalized_test, self.sequence_length)
-        scaler = MinMaxScaler(copy=True, feature_range=(0, 1))
-        scaler.fit(trainX)
-        trainX = scaler.transform(trainX)
-        trainY = scaler.transform(trainY)
-        valX = scaler.transform(valX)
-        valY = scaler.transform(valY)
+        
         self.trainX = TensorDataset(torch.from_numpy(trainX))
         self.trainY = TensorDataset(torch.from_numpy(trainY))
         self.valX = TensorDataset(torch.from_numpy(valX))
