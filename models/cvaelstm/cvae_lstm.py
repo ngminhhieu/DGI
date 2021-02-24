@@ -19,14 +19,14 @@ class Encoder(nn.Module):
     :param dropout: percentage of nodes to dropout
     :param block: LSTM/GRU block
     """
-    def __init__(self, number_of_features, hidden_size, hidden_layer_depth, latent_length, dropout, block = 'LSTM'):
+    def __init__(self, number_of_features, hidden_size, batch_size, hidden_layer_depth, latent_length, dropout, block = 'LSTM'):
 
         super(Encoder, self).__init__()
         self.number_of_features = number_of_features
         self.hidden_size = hidden_size
         self.hidden_layer_depth = hidden_layer_depth
         self.latent_length = latent_length
-        self.c_0 = torch.zeros(self.hidden_layer_depth, self.batch_size, self.hidden_size, requires_grad=True).type(self.dtype)
+        self.c_0 = torch.zeros(self.hidden_layer_depth, batch_size, self.hidden_size, requires_grad=True).type(self.dtype)
         if block == 'LSTM':
             self.model = nn.LSTM(self.number_of_features, self.hidden_size, self.hidden_layer_depth, dropout = dropout)
         elif block == 'GRU':
@@ -176,18 +176,32 @@ class VRAE(BaseEstimator, nn.Module):
         self.condition = condition
         self.dtype = torch.FloatTensor
         self.use_cuda = cuda
+        self.sequence_length = sequence_length
+        self.hidden_size = hidden_size
+        self.hidden_layer_depth = hidden_layer_depth
+        self.latent_length = latent_length
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.n_epochs = n_epochs
+        self.patience = patience
+
+        self.print_every = print_every
+        self.clip = clip
+        self.max_grad_norm = max_grad_norm
+        self.is_fitted = False
+        self.dload = dload
 
         if not torch.cuda.is_available() and self.use_cuda:
             self.use_cuda = False
 
-
         if self.use_cuda:
             self.dtype = torch.cuda.FloatTensor
 
-        self.embedding_condition = nn.Linear(batch_size, hidden_size)
+        self.embedding_condition = nn.Linear(self.batch_size, self.hidden_size)
 
         self.encoder = Encoder(number_of_features = number_of_features,
                                hidden_size=hidden_size,
+                               batch_size=batch_size,
                                hidden_layer_depth=hidden_layer_depth,
                                latent_length=latent_length,
                                dropout=dropout_rate,
@@ -205,21 +219,6 @@ class VRAE(BaseEstimator, nn.Module):
                                output_size=output_dim,
                                block=block,
                                dtype=self.dtype)
-
-        self.sequence_length = sequence_length
-        self.hidden_size = hidden_size
-        self.hidden_layer_depth = hidden_layer_depth
-        self.latent_length = latent_length
-        self.batch_size = batch_size
-        self.learning_rate = learning_rate
-        self.n_epochs = n_epochs
-        self.patience = patience
-
-        self.print_every = print_every
-        self.clip = clip
-        self.max_grad_norm = max_grad_norm
-        self.is_fitted = False
-        self.dload = dload
 
         if self.use_cuda:
             self.cuda()
