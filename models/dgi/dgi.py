@@ -16,7 +16,6 @@ class DGI(nn.Module):
 
     def forward(self, seq1, seq2, adj, sparse, msk, samp_bias1, samp_bias2):
         h_1 = self.gcn(seq1, adj, sparse)
-
         c = self.read(h_1, msk)
         c = self.sigm(c)
 

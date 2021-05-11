@@ -142,7 +142,6 @@ def build_graph(location_path):
 
     kdt = KDTree(data_points, leaf_size=30, metric='euclidean')
     dist, ind = kdt.query(data_points, k=len(data_points), return_distance=True)
-    # print(dist)
     ind, dist = kdt.query_radius(data_points, r=0.3, return_distance=True)
     for i in range(len(data_points)):
         source = np.delete(ind[i], np.where(ind[i]==i))

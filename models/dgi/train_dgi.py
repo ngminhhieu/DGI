@@ -94,17 +94,20 @@ class ConfigDGI:
                 optimiser.zero_grad()
 
                 idx = np.random.permutation(nb_nodes)
-                shuf_fts = features[:, idx, :]
+                # hj
+                shuf_fts = features[:, idx, :].copy()
 
-                lbl_1 = torch.ones(self.batch_size, nb_nodes)
-                lbl_2 = torch.zeros(self.batch_size, nb_nodes)
+                # classification
+                # lbl_1 = torch.ones(self.batch_size, nb_nodes)
+                # lbl_2 = torch.zeros(self.batch_size, nb_nodes)
+                label = (self.batch_size, nb_nodes)
                 lbl = torch.cat((lbl_1, lbl_2), 1)
 
                 if torch.cuda.is_available():
                     shuf_fts = shuf_fts.cuda()
                     lbl = lbl.cuda()
                 
-                # forward
+                # forward        h_i       h_j
                 logits = model(features, shuf_fts, self.sp_adj if self.sparse else self.adj, self.sparse, None, None, None)
 
                 # hàm loss phải đạo hàm được nếu muốn tự config
@@ -145,29 +148,29 @@ class ConfigDGI:
         # test_lbls = labels[idx_test, :, :]
 
     # def test(self):
-        cost = 0
-        nb_testings = 1
-        for _ in range(nb_testings):
-            multReg = MultipleRegression(embeds.shape[2])
-            opt = torch.optim.Adam(multReg.parameters(), lr=0.01, weight_decay=0.0)
-            # multReg.cuda()
+        # cost = 0
+        # nb_testings = 1
+        # for _ in range(nb_testings):
+        #     multReg = MultipleRegression(embeds.shape[2])
+        #     opt = torch.optim.Adam(multReg.parameters(), lr=0.01, weight_decay=0.0)
+        #     # multReg.cuda()
 
-            for _ in range(100):
-                multReg.train()
-                opt.zero_grad()
+        #     for _ in range(100):
+        #         multReg.train()
+        #         opt.zero_grad()
 
-                # logits = multReg(train_embs)
-                # loss = mae_loss(logits, train_lbls)
-                logits = multReg(embeds)
-                loss = mae_loss(logits, labels)
-                loss.backward()
-                opt.step()
+        #         # logits = multReg(train_embs)
+        #         # loss = mae_loss(logits, train_lbls)
+        #         logits = multReg(embeds)
+        #         loss = mae_loss(logits, labels)
+        #         loss.backward()
+        #         opt.step()
 
-            # preds = multReg(test_embs)
-            # cost += abs(preds - test_lbls)/test_lbls
-            preds = multReg(embeds)
-            cost += abs(preds - labels)/labels
+        #     # preds = multReg(test_embs)
+        #     # cost += abs(preds - test_lbls)/test_lbls
+        #     preds = multReg(embeds)
+        #     cost += abs(preds - labels)/labels
 
-        ebs = preds.detach().numpy()
-        ebs = np.squeeze(ebs)
-        np.savez(self.log_dgi+'/embeds.npz', embeds = ebs)
+        # ebs = preds.detach().numpy()
+        # ebs = np.squeeze(ebs)
+        # np.savez(self.log_dgi+'/embeds.npz', embeds = ebs)
