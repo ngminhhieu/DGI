@@ -11,7 +11,6 @@ from utils.cvaelstm.process import BaseEstimator
 class Encoder(nn.Module):
     """
     Encoder network containing enrolled LSTM/GRU
-
     :param number_of_features: number of input features
     :param hidden_size: hidden size of the RNN
     :param hidden_layer_depth: number of layers in RNN
@@ -47,7 +46,6 @@ class Encoder(nn.Module):
 
     def forward(self, x, c=None):
         """Forward propagation of encoder. Given input, outputs the last hidden state of encoder
-
         :param x: input to the encoder, of shape (sequence_length, batch_size, number_of_features)
         :return: last hidden state of encoder, of shape (batch_size, hidden_size)
         """
@@ -64,7 +62,6 @@ class Encoder(nn.Module):
 
 class Lambda(nn.Module):
     """Lambda module converts output of encoder to latent vector
-
     :param hidden_size: hidden size of the encoder
     :param latent_length: latent vector length
     """
@@ -84,7 +81,6 @@ class Lambda(nn.Module):
 
     def forward(self, cell_output):
         """Given last hidden state of encoder, passes through a linear layer, and finds the mean and variance
-
         :param cell_output: last hidden state of encoder
         :return: latent vector
         """
@@ -101,7 +97,6 @@ class Lambda(nn.Module):
 
 class Decoder(nn.Module):
     """Converts latent vector into output
-
     :param sequence_length: length of the input sequence
     :param batch_size: batch size of the input sequence
     :param hidden_size: hidden size of the RNN
@@ -145,7 +140,6 @@ class Decoder(nn.Module):
 
     def forward(self, latent, c=None):
         """Converts latent to hidden to output
-
         :param latent: latent vector
         :return: outputs consisting of mean and std dev of vector
         """
@@ -172,7 +166,6 @@ def _assert_no_grad(tensor):
 
 class VRAE(BaseEstimator, nn.Module):
     """Variational recurrent auto-encoder. This module is used for dimensionality reduction of timeseries
-
     :param sequence_length: length of the input sequence
     :param number_of_features: number of input features
     :param hidden_size:  hidden size of the RNN
@@ -276,7 +269,6 @@ class VRAE(BaseEstimator, nn.Module):
     def forward(self, x, conditional, condition=None):
         """
         Forward propagation which involves one pass from inputs to encoder to lambda to decoder
-
         :param x:input tensor
         :return: the decoded output, latent vector
         """
@@ -290,7 +282,6 @@ class VRAE(BaseEstimator, nn.Module):
     def _rec(self, x_decoded, x, loss_fn):
         """
         Compute the loss given output x decoded, input x and the specified loss function
-
         :param x_decoded: output of the decoder
         :param x: input to the encoder
         :param loss_fn: loss function specified
@@ -307,7 +298,6 @@ class VRAE(BaseEstimator, nn.Module):
         """
         Given input tensor, forward propagate, compute the loss, and backward propagate.
         Represents the lifecycle of a single iteration
-
         :param X: Input tensor
         :return: total loss, reconstruction loss, kl-divergence loss and original input
         """
@@ -323,7 +313,6 @@ class VRAE(BaseEstimator, nn.Module):
     def _train(self, train_input_loader, train_target_loader):
         """
         For each epoch, given the batch_size, run this function batch_size * num_of_batches number of times
-
         :param train_loader:input train loader with shuffle
         :return:
         """
@@ -376,7 +365,6 @@ class VRAE(BaseEstimator, nn.Module):
     def fit(self, dataset_train_input, dataset_train_target):
         """
         Calls `_train` function over a fixed number of epochs, specified by `n_epochs`
-
         :param dataset: `Dataset` object
         :param bool save: If true, dumps the trained model parameters as pickle file at `dload` directory
         :return:
@@ -403,7 +391,6 @@ class VRAE(BaseEstimator, nn.Module):
     def _batch_transform(self, x):
         """
         Passes the given input tensor into encoder and lambda function
-
         :param x: input batch tensor
         :return: intermediate latent vector
         """
@@ -416,7 +403,6 @@ class VRAE(BaseEstimator, nn.Module):
     def _batch_reconstruct(self, x, condition):
         """
         Passes the given input tensor into encoder, lambda and decoder function
-
         :param x: input batch tensor
         :return: reconstructed output tensor
         """
@@ -430,7 +416,6 @@ class VRAE(BaseEstimator, nn.Module):
         """
         Given input dataset, creates dataloader, runs dataloader on `_batch_reconstruct`
         Prerequisite is that model has to be fit
-
         :param dataset: input dataset who's output vectors are to be obtained
         :param bool save: If true, dumps the output vector dataframe as a pickle file
         :return:
@@ -471,7 +456,6 @@ class VRAE(BaseEstimator, nn.Module):
         """
         Given input dataset, creates dataloader, runs dataloader on `_batch_transform`
         Prerequisite is that model has to be fit
-
         :param dataset: input dataset who's latent vectors are to be obtained
         :param bool save: If true, dumps the latent vector dataframe as a pickle file
         :return:
@@ -507,7 +491,6 @@ class VRAE(BaseEstimator, nn.Module):
     def fit_transform(self, dataset, save = True):
         """
         Combines the `fit` and `transform` functions above
-
         :param dataset: Dataset on which fit and transform have to be performed
         :param bool save: If true, dumps the model and latent vectors as pickle file
         :return: latent vectors for input dataset
@@ -518,7 +501,6 @@ class VRAE(BaseEstimator, nn.Module):
     def save(self, file_name):
         """
         Pickles the model parameters to be retrieved later
-
         :param file_name: the filename to be saved as,`dload` serves as the download directory
         :return: None
         """
@@ -532,7 +514,6 @@ class VRAE(BaseEstimator, nn.Module):
     def load(self, PATH):
         """
         Loads the model's parameters from the path mentioned
-
         :param PATH: Should contain pickle file
         :return: None
         """
